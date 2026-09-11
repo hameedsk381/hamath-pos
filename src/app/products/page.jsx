@@ -151,20 +151,24 @@ export default function ProductsPage() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
-          <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>ఉత్పత్తుల కేటలాగ్ (Products)</h2>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{filteredProducts.length} ఉత్పత్తులు అందుబాటులో ఉన్నాయి</div>
+          <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--slate-900)' }}>
+            Product Catalogue & Stock
+          </h1>
+          <div style={{ fontSize: '12px', color: 'var(--slate-500)', marginTop: '2px' }}>
+            ఉత్పత్తుల కేటలాగ్ • {filteredProducts.length} items available
+          </div>
         </div>
         <button className="btn btn-primary btn-sm" onClick={openAddModal}>
-          + కొత్త వస్తువు (Add Product)
+          + Add New Product
         </button>
       </div>
 
-      {/* Search Input */}
-      <div style={{ marginBottom: '12px' }}>
+      {/* Search Input Bar */}
+      <div style={{ marginBottom: '14px', position: 'relative' }}>
         <input
           type="text"
           className="form-input"
-          placeholder="🔍 ఉత్పత్తి పేరు లేదా అలియాస్ వెతకండి..."
+          placeholder="Search products by English or Telugu name, barcode, or voice alias..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -188,17 +192,17 @@ export default function ProductsPage() {
         <div
           className={`cat-tab ${showLowStockOnly ? 'active' : ''}`}
           onClick={() => setShowLowStockOnly(!showLowStockOnly)}
-          style={{ cursor: 'pointer', whiteSpace: 'nowrap', borderColor: '#fca5a5', background: showLowStockOnly ? '#fef2f2' : '#fff5f5', color: '#b91c1c', fontWeight: 700 }}
+          style={{ cursor: 'pointer', whiteSpace: 'nowrap', borderColor: 'var(--accent-amber-border)', background: showLowStockOnly ? 'var(--accent-amber-light)' : '#ffffff', color: showLowStockOnly ? 'var(--accent-amber)' : 'var(--slate-700)', fontWeight: 700 }}
         >
-          ⚠️ తక్కువ స్టాక్ (Low Stock)
+          Low Stock Only
         </div>
       </div>
 
       {/* Products List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {filteredProducts.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)' }}>
-            ఉత్పత్తులు ఏవీ కనుగొనబడలేదు.
+          <div style={{ textAlign: 'center', padding: '36px 10px', color: 'var(--slate-400)', background: '#ffffff', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+            No products match the selected criteria.
           </div>
         ) : (
           filteredProducts.map(p => {
@@ -208,46 +212,46 @@ export default function ProductsPage() {
               <div key={p.id} className="doc-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ flex: 1, minWidth: '220px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>{p.name}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 600 }}>{p.name_te}</div>
-                    {/* Stock Badge */}
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--slate-900)' }}>{p.name}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--slate-500)' }}>({p.name_te})</div>
+                    {/* Stock Pill */}
                     {stock <= 0 ? (
-                      <span className="stock-tag-pill out-stock">❌ నిండుకుంది (0 {p.unit})</span>
+                      <span className="stock-pill out">● Out of Stock (0 {p.unit})</span>
                     ) : stock <= reorder ? (
-                      <span className="stock-tag-pill low-stock">⚠️ తక్కువ స్టాక్: {stock} {p.unit}</span>
+                      <span className="stock-pill low">● Low Stock: {stock} {p.unit}</span>
                     ) : (
-                      <span className="stock-tag-pill in-stock">✓ స్టాక్: {stock} {p.unit}</span>
+                      <span className="stock-pill in-stock">● In Stock: {stock} {p.unit}</span>
                     )}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    <span style={{ background: 'var(--bg-subtle)', padding: '2px 6px', borderRadius: '4px' }}>{p.category}</span>
-                    • యూనిట్: <strong>{p.unit}</strong> ({p.unit_te || p.unit})
+                  <div style={{ fontSize: '11px', color: 'var(--slate-500)', marginTop: '4px' }}>
+                    <span style={{ background: 'var(--slate-100)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>{p.category}</span>
+                    • Unit: <strong>{p.unit}</strong>
                     • GST: <strong>{p.gst_percent}%</strong>
-                    {p.cost_price > 0 && ` • కొనుగోలు: ₹${p.cost_price}`}
+                    {p.cost_price > 0 && ` • Cost: ₹${p.cost_price}`}
                   </div>
                   {p.aliases && p.aliases.length > 0 && (
-                    <div style={{ fontSize: '10px', color: '#64748b', marginTop: '3px' }}>
-                      🗣️ Aliases: {p.aliases.slice(0, 4).join(', ')}
+                    <div style={{ fontSize: '11px', color: 'var(--slate-400)', marginTop: '3px' }}>
+                      Voice Aliases: {p.aliases.slice(0, 4).join(', ')}
                     </div>
                   )}
                 </div>
 
                 <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 'auto' }}>
-                  <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--primary-dark)' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--slate-900)' }}>
                     {documentGenerator.formatCurrency(p.selling_price)}
                   </div>
                   <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
                     <button
                       type="button"
                       className="btn btn-outline btn-sm"
-                      style={{ fontSize: '11px', padding: '4px 8px', color: 'var(--primary)', borderColor: 'var(--primary-border)', background: 'var(--primary-light)' }}
+                      style={{ fontSize: '11px', padding: '4px 8px', color: 'var(--primary-dark)', borderColor: 'var(--primary-border)', background: 'var(--primary-light)' }}
                       onClick={() => openInwardModal(p)}
-                      title="Add or Adjust Stock"
+                      title="Adjust or Inward Stock"
                     >
-                      + స్టాక్ ఇన్వర్డ్
+                      + Inward Stock
                     </button>
-                    <button type="button" className="btn btn-outline btn-sm" onClick={() => openEditModal(p)}>✏️</button>
-                    <button type="button" className="btn btn-danger-outline btn-sm" onClick={() => handleDelete(p.id)}>🗑️</button>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => openEditModal(p)}>Edit</button>
+                    <button type="button" className="btn btn-danger-outline btn-sm" onClick={() => handleDelete(p.id)}>Delete</button>
                   </div>
                 </div>
               </div>

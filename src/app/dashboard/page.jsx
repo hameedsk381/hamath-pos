@@ -5,6 +5,17 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { store } from '@/lib/store';
 import { documentGenerator } from '@/lib/pdf-generator';
+import {
+  MicIcon,
+  CashIcon,
+  QrCodeIcon,
+  CreditCardIcon,
+  AlertCircleIcon,
+  PackageIcon,
+  UsersIcon,
+  FileTextIcon,
+  BarChartIcon
+} from '@/components/Icons';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -24,7 +35,6 @@ export default function DashboardPage() {
   const todayInvoices = invoices.filter(i => i.date === todayStr);
   const todaySales = todayInvoices.reduce((sum, i) => sum + (parseFloat(i.total) || 0), 0);
   const allSales = invoices.reduce((sum, i) => sum + (parseFloat(i.total) || 0), 0);
-  const pendingQuotations = quotations.filter(q => q.status === 'pending');
 
   // Commercial Khata & Stock Metrics
   const totalReceivables = customers.reduce((sum, c) => sum + (parseFloat(c.current_balance) || 0), 0);
@@ -42,142 +52,161 @@ export default function DashboardPage() {
   return (
     <div className="view-container">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
-          <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>వ్యాపార డ్యాష్‌బోర్డ్ (Commercial Dashboard)</h2>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-            {new Date().toLocaleDateString('te-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--slate-900)' }}>
+            Business Overview & Analytics
+          </h1>
+          <div style={{ fontSize: '12px', color: 'var(--slate-500)', marginTop: '2px' }}>
+            వ్యాపార విశ్లేషణలు • {new Date().toLocaleDateString('te-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
         </div>
         <Link href="/" className="btn btn-primary btn-sm" style={{ textDecoration: 'none' }}>
-          🎙️ మాట్లాడండి (Speak)
+          <MicIcon size={16} /> Open Voice Register
         </Link>
       </div>
 
       {/* Primary Metrics Grid */}
       <div className="metrics-grid">
-        <div className="metric-card" style={{ borderLeft: '4px solid var(--primary)' }}>
-          <div className="metric-label">ఈరోజు అమ్మకాలు (Today's Sales)</div>
-          <div className="metric-value" style={{ color: 'var(--primary)' }}>
+        <div className="metric-card" style={{ borderTop: '3px solid var(--primary)' }}>
+          <div className="metric-label">Today's Sales / నేటి అమ్మకాలు</div>
+          <div className="metric-value">
             {documentGenerator.formatCurrency(todaySales || allSales)}
           </div>
-          <div className="metric-sub">{todayInvoices.length || invoices.length} ఇన్వాయిస్‌లు</div>
+          <div className="metric-sub">{todayInvoices.length || invoices.length} settled invoices</div>
         </div>
 
-        <div className="metric-card" style={{ borderLeft: '4px solid #b91c1c' }}>
-          <div className="metric-label">మార్కెట్ బాకీ బకాయిలు (Receivables / Udhaar)</div>
-          <div className="metric-value" style={{ color: '#b91c1c' }}>
+        <div className="metric-card" style={{ borderTop: '3px solid var(--accent-red)' }}>
+          <div className="metric-label">Receivables / మార్కెట్ బాకీ</div>
+          <div className="metric-value" style={{ color: 'var(--accent-red)' }}>
             {documentGenerator.formatCurrency(totalReceivables)}
           </div>
-          <div className="metric-sub">{customers.filter(c => (c.current_balance || 0) > 0).length} కస్టమర్లు బాకీ ఉన్నారు</div>
+          <div className="metric-sub">{customers.filter(c => (c.current_balance || 0) > 0).length} customers with outstanding due</div>
         </div>
 
-        <div className="metric-card" style={{ borderLeft: '4px solid #0284c7' }}>
-          <div className="metric-label">స్టాక్ ఇన్వెంటరీ విలువ (Stock Valuation)</div>
-          <div className="metric-value" style={{ color: '#0284c7' }}>
+        <div className="metric-card" style={{ borderTop: '3px solid var(--accent-blue)' }}>
+          <div className="metric-label">Stock Valuation / ఇన్వెంటరీ నిల్వ</div>
+          <div className="metric-value">
             {documentGenerator.formatCurrency(totalStockValuation)}
           </div>
-          <div className="metric-sub">{products.length} కేటలాగ్ వస్తువులు</div>
+          <div className="metric-sub">{products.length} active inventory items</div>
         </div>
 
-        <div className="metric-card" style={{ borderLeft: '4px solid #d97706' }}>
-          <div className="metric-label">తక్కువ స్టాక్ హెచ్చరికలు (Low Stock Alerts)</div>
-          <div className="metric-value" style={{ color: lowStockProducts.length > 0 ? '#b91c1c' : '#059669' }}>
+        <div className="metric-card" style={{ borderTop: '3px solid var(--accent-amber)' }}>
+          <div className="metric-label">Low Stock Reorders / తక్కువ నిల్వ</div>
+          <div className="metric-value" style={{ color: lowStockProducts.length > 0 ? 'var(--accent-amber)' : 'var(--primary)' }}>
             {lowStockProducts.length}
           </div>
-          <div className="metric-sub">{lowStockProducts.length > 0 ? 'వెంటనే ఆర్డర్ చేయాలి' : 'స్టాక్ సరిపడా ఉంది'}</div>
+          <div className="metric-sub">{lowStockProducts.length > 0 ? 'Items below reorder limit' : 'All items optimal'}</div>
         </div>
       </div>
 
       {/* Payment Modes Breakdown Bar */}
-      <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '16px', marginBottom: '20px', boxShadow: 'var(--shadow-subtle)' }}>
-        <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '10px' }}>
-          📊 చెల్లింపు విధానాల నివేదిక (Payment Breakdown):
+      <div className="console-card" style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--slate-500)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '12px' }}>
+          Settlement Channels / చెల్లింపు నివేదిక
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
-          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px', borderRadius: '8px' }}>
-            <div style={{ fontSize: '11px', color: '#166534', fontWeight: 700 }}>💵 నగదు (Cash)</div>
-            <div style={{ fontSize: '16px', fontWeight: 900, color: '#15803d', marginTop: '2px' }}>{documentGenerator.formatCurrency(cashSales)}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+          <div style={{ background: 'var(--slate-50)', border: '1px solid var(--border-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '38px', height: '38px', borderRadius: 'var(--radius-sm)', background: '#ffffff', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+              <CashIcon size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--slate-500)', fontWeight: 600 }}>Cash Sales</div>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--slate-900)' }}>{documentGenerator.formatCurrency(cashSales)}</div>
+            </div>
           </div>
-          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px', borderRadius: '8px' }}>
-            <div style={{ fontSize: '11px', color: '#1e40af', fontWeight: 700 }}>📲 UPI / QR</div>
-            <div style={{ fontSize: '16px', fontWeight: 900, color: '#1d4ed8', marginTop: '2px' }}>{documentGenerator.formatCurrency(upiSales)}</div>
+
+          <div style={{ background: 'var(--slate-50)', border: '1px solid var(--border-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '38px', height: '38px', borderRadius: 'var(--radius-sm)', background: '#ffffff', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-blue)' }}>
+              <QrCodeIcon size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--slate-500)', fontWeight: 600 }}>Bharat UPI / QR</div>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--slate-900)' }}>{documentGenerator.formatCurrency(upiSales)}</div>
+            </div>
           </div>
-          <div style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: '10px', borderRadius: '8px' }}>
-            <div style={{ fontSize: '11px', color: '#92400e', fontWeight: 700 }}>⚠️ బాకీ (Credit / Udhaar)</div>
-            <div style={{ fontSize: '16px', fontWeight: 900, color: '#b45309', marginTop: '2px' }}>{documentGenerator.formatCurrency(creditSales)}</div>
+
+          <div style={{ background: 'var(--slate-50)', border: '1px solid var(--border-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '38px', height: '38px', borderRadius: 'var(--radius-sm)', background: '#ffffff', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-amber)' }}>
+              <CreditCardIcon size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--slate-500)', fontWeight: 600 }}>Udhaar / Credit</div>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--slate-900)' }}>{documentGenerator.formatCurrency(creditSales)}</div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Low Stock Alert Strip (if any) */}
+      {/* Low Stock Reorder Strip */}
       {lowStockProducts.length > 0 && (
-        <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', padding: '14px', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: '#991b1b' }}>
-              ⚠️ స్టాక్ తక్కువగా ఉన్న వస్తువులు (Reorder Required):
+        <div style={{ background: 'var(--accent-amber-light)', border: '1px solid var(--accent-amber-border)', borderRadius: 'var(--radius-md)', padding: '14px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-amber)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <AlertCircleIcon size={16} />
+              <span>Inventory Threshold Reorder Alert (తక్కువ స్టాక్ ఉన్న వస్తువులు)</span>
             </div>
-            <Link href="/products" style={{ fontSize: '11px', color: '#b91c1c', fontWeight: 700, textDecoration: 'none' }}>
-              అన్ని ఉత్పత్తులు చూడండి →
+            <Link href="/products" style={{ fontSize: '11px', color: 'var(--accent-amber)', fontWeight: 700, textDecoration: 'none' }}>
+              Manage Catalogue →
             </Link>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {lowStockProducts.slice(0, 5).map(p => (
-              <span key={p.id} style={{ background: '#ffffff', border: '1px solid #fca5a5', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', color: '#b91c1c', fontWeight: 700 }}>
-                {p.name} ({p.name_te}): <strong>{p.current_stock || 0} {p.unit}</strong> left
+            {lowStockProducts.slice(0, 6).map(p => (
+              <span key={p.id} style={{ background: '#ffffff', border: '1px solid var(--accent-amber-border)', padding: '4px 10px', borderRadius: '4px', fontSize: '12px', color: 'var(--slate-800)', fontWeight: 600 }}>
+                {p.name}: <strong style={{ color: 'var(--accent-red)' }}>{p.current_stock || 0} {p.unit}</strong> remaining
               </span>
             ))}
           </div>
         </div>
       )}
 
-      {/* Quick Voice Start Banner */}
-      <div style={{ background: 'linear-gradient(135deg, #064e3b 0%, #047857 100%)', color: '#ffffff', borderRadius: 'var(--radius-md)', padding: '18px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ fontWeight: 800, fontSize: '16px' }}>కొత్త బిల్లు సిద్ధం చేయాలా?</div>
-          <div style={{ fontSize: '12px', opacity: 0.9, marginTop: '2px' }}>“మాట్లాడితే బిల్ రెడీ” - డెస్క్‌టాప్ కౌంటర్‌లో లైవ్‌గా మాట్లాడి బిల్లు చేయండి.</div>
-        </div>
-        <Link href="/" className="btn btn-sm" style={{ background: '#ffffff', color: '#064e3b', fontWeight: 800, textDecoration: 'none' }}>
-          🎙️ Start Voice Studio
-        </Link>
-      </div>
-
-      {/* Recent Documents Preview */}
-      <div style={{ marginBottom: '12px', fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-        ఇటీవలి లావాదేవీలు (Recent Transactions)
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {invoices.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
-            ఇంకా ఎలాంటి బిల్లులు రూపొందించబడలేదు.
+      {/* Recent Invoices Ledger Table */}
+      <div className="console-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--slate-600)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            Recent Register Transactions / ఇటీవలి బిల్లులు
           </div>
-        ) : (
-          invoices.slice(0, 5).map(inv => (
-            <div
-              key={inv.id}
-              className="doc-card"
-              onClick={() => router.push(`/document/${inv.id}?type=invoice`)}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className="doc-card-header">
-                <div className="doc-number">
-                  <span className="confirm-type-pill invoice" style={{ marginRight: '6px', fontSize: '10px' }}>INVOICE</span>
-                  <strong>{inv.invoice_number}</strong>
-                </div>
-                <div className="doc-amount">{documentGenerator.formatCurrency(inv.total)}</div>
-              </div>
-              <div className="doc-meta-row">
-                <div>👤 {inv.customer_name_snapshot || inv.customer_name || 'Retail'}</div>
-                <div>
-                  📅 {inv.date} • <span style={{ color: inv.payment_mode === 'credit' ? '#b45309' : '#059669', fontWeight: 700 }}>
-                    {inv.payment_mode === 'credit' ? 'బాకీ (CREDIT)' : (inv.payment_mode || 'CASH').toUpperCase()}
-                  </span>
-                </div>
-              </div>
+          <Link href="/documents" style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 700, textDecoration: 'none' }}>
+            View All Documents →
+          </Link>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {invoices.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '28px', color: 'var(--slate-400)', fontSize: '13px' }}>
+              No transactions recorded yet.
             </div>
-          ))
-        )}
+          ) : (
+            invoices.slice(0, 6).map(inv => (
+              <div
+                key={inv.id}
+                className="doc-card"
+                onClick={() => router.push(`/document/${inv.id}?type=invoice`)}
+                style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, background: 'var(--slate-100)', border: '1px solid var(--border-subtle)', padding: '2px 6px', borderRadius: '4px', color: 'var(--slate-700)' }}>
+                      INVOICE
+                    </span>
+                    <strong style={{ fontSize: '14px', color: 'var(--slate-900)' }}>{inv.invoice_number}</strong>
+                    <span style={{ fontSize: '12px', color: 'var(--slate-500)' }}>• {inv.customer_name_snapshot || inv.customer_name || 'Retail Customer'}</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--slate-400)', marginTop: '4px' }}>
+                    Date: {inv.date} • Mode: <span style={{ fontWeight: 700, color: inv.payment_mode === 'credit' ? 'var(--accent-amber)' : 'var(--primary)' }}>{(inv.payment_mode || 'cash').toUpperCase()}</span>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--slate-900)' }}>
+                    {documentGenerator.formatCurrency(inv.total)}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

@@ -4,6 +4,16 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { store } from '@/lib/store';
 import { documentGenerator } from '@/lib/pdf-generator';
+import { 
+  UsersIcon, 
+  SearchIcon, 
+  PhoneIcon, 
+  WhatsAppIcon, 
+  PlusIcon, 
+  EditIcon, 
+  CheckCircleIcon, 
+  AlertCircleIcon 
+} from '@/components/Icons';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState([]);
@@ -103,20 +113,25 @@ export default function CustomersPage() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
-          <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>కస్టమర్ల డైరెక్టరీ & ఖాటా (Customers & Khata)</h2>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{filteredCustomers.length} కస్టమర్లు నమోదు చేయబడ్డారు</div>
+          <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--slate-900)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            <UsersIcon size={22} style={{ color: 'var(--primary-dark)' }} />
+            Customer Directory & Khata
+          </h1>
+          <div style={{ fontSize: '12px', color: 'var(--slate-500)', marginTop: '2px' }}>
+            కస్టమర్ల డైరెక్టరీ & ఖాటా • {filteredCustomers.length} registered accounts
+          </div>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={openAddModal}>
-          + కొత్త కస్టమర్ (Add)
+        <button className="btn btn-primary btn-sm" onClick={openAddModal} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <PlusIcon size={15} /> Add Customer
         </button>
       </div>
 
       {/* Search Input */}
-      <div style={{ marginBottom: '14px' }}>
+      <div style={{ marginBottom: '14px', position: 'relative' }}>
         <input
           type="text"
           className="form-input"
-          placeholder="🔍 కస్టమర్ పేరు లేదా ఫోన్ నంబర్ వెతకండి..."
+          placeholder="Search by customer name, Telugu name, phone number, or GSTIN..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -125,8 +140,8 @@ export default function CustomersPage() {
       {/* Customer Cards List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {filteredCustomers.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)' }}>
-            కస్టమర్లు ఎవరూ కనుగొనబడలేదు.
+          <div style={{ textAlign: 'center', padding: '36px 10px', color: 'var(--slate-400)', background: '#ffffff', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+            No customer accounts found matching search.
           </div>
         ) : (
           filteredCustomers.map(c => {
@@ -135,50 +150,54 @@ export default function CustomersPage() {
               <div key={c.id} className="doc-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>{c.name}</div>
-                    {c.name_te && <div style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 600 }}>({c.name_te})</div>}
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--slate-900)' }}>{c.name}</div>
+                    {c.name_te && <div style={{ fontSize: '12px', color: 'var(--slate-500)', fontWeight: 600 }}>({c.name_te})</div>}
                     {bal > 0 ? (
-                      <span style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '4px' }}>
-                        ⚠️ బాకీ: {documentGenerator.formatCurrency(bal)}
+                      <span className="stock-pill low" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertCircleIcon size={12} /> Due: {documentGenerator.formatCurrency(bal)}
                       </span>
                     ) : (
-                      <span style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px' }}>
-                        ✓ క్లియర్ (₹0 Due)
+                      <span className="stock-pill in-stock" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircleIcon size={12} /> Clear (₹0 Due)
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    📞 {c.phone} {c.address ? `• 📍 ${c.address}` : ''}
+                  <div style={{ fontSize: '12px', color: 'var(--slate-500)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <PhoneIcon size={13} style={{ color: 'var(--slate-400)' }} />
+                    <span>{c.phone}</span>
+                    {c.address && <span>• {c.address}</span>}
                   </div>
-                  {c.gstin && <div style={{ fontSize: '11px', color: '#0284c7', fontWeight: 600, marginTop: '2px' }}>GSTIN: {c.gstin}</div>}
+                  {c.gstin && <div style={{ fontSize: '11px', color: 'var(--primary-dark)', fontWeight: 600, marginTop: '2px' }}>GSTIN: {c.gstin}</div>}
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Link
                     href={`/customer/${c.id}`}
                     className="btn btn-outline btn-sm"
-                    style={{ fontWeight: 700, color: 'var(--primary)', borderColor: 'var(--primary-border)', background: 'var(--primary-light)' }}
+                    style={{ fontWeight: 700, color: 'var(--primary-dark)', borderColor: 'var(--primary-border)', background: 'var(--primary-light)' }}
                   >
-                    📖 ఖాతా లెడ్జర్ (Khata)
+                    Khata Ledger
                   </Link>
 
                   {c.phone && (
                     <>
-                      <a href={`tel:${c.phone}`} className="btn btn-outline btn-sm" style={{ padding: '4px 8px' }} title="Call">📞</a>
+                      <a href={`tel:${c.phone}`} className="btn btn-outline btn-sm" style={{ padding: '6px 8px' }} title="Call Customer">
+                        <PhoneIcon size={14} />
+                      </a>
                       <a
                         href={`https://wa.me/91${c.phone.replace(/[^0-9]/g, '')}`}
                         target="_blank"
                         rel="noreferrer"
                         className="btn btn-outline btn-sm"
-                        style={{ padding: '4px 8px', color: '#25d366' }}
-                        title="WhatsApp"
+                        style={{ padding: '6px 8px', color: '#16a34a' }}
+                        title="WhatsApp Message"
                       >
-                        💬
+                        <WhatsAppIcon size={14} />
                       </a>
                     </>
                   )}
-                  <button type="button" className="btn btn-outline btn-sm" style={{ padding: '4px 8px' }} onClick={() => openEditModal(c)}>
-                    ✏️
+                  <button type="button" className="btn btn-outline btn-sm" style={{ padding: '6px 8px' }} onClick={() => openEditModal(c)} title="Edit Customer Details">
+                    <EditIcon size={14} />
                   </button>
                 </div>
               </div>
@@ -189,38 +208,16 @@ export default function CustomersPage() {
 
       {/* Customer Modal */}
       {modalOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(15, 23, 42, 0.6)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '16px',
-            maxWidth: '500px',
-            width: '100%',
-            padding: '24px',
-            boxShadow: 'var(--shadow-card)',
-            maxHeight: '90vh',
-            overflowY: 'auto'
-          }}>
+        <div className="modal-backdrop-overlay" onClick={() => setModalOpen(false)}>
+          <div className="modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>
-                {editingCustomer ? 'కస్టమర్ వివరాలు సవరించండి' : 'కొత్త కస్టమర్‌ని చేర్చండి'}
+              <h3 style={{ fontSize: '17px', fontWeight: 800, color: 'var(--slate-900)', margin: 0 }}>
+                {editingCustomer ? 'Edit Customer Details' : 'Add New Customer'}
               </h3>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                style={{ border: 'none', background: 'transparent', fontSize: '20px', cursor: 'pointer' }}
+                style={{ border: 'none', background: 'transparent', fontSize: '18px', cursor: 'pointer', color: 'var(--slate-400)' }}
               >
                 ✕
               </button>
@@ -228,7 +225,7 @@ export default function CustomersPage() {
 
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label className="form-label">కస్టమర్ పేరు / Name *</label>
+                <label className="form-label">Customer Name / పేరు *</label>
                 <input
                   type="text"
                   required
@@ -239,7 +236,7 @@ export default function CustomersPage() {
               </div>
 
               <div>
-                <label className="form-label">తెలుగు పేరు / Telugu Name</label>
+                <label className="form-label">Telugu Name / తెలుగు పేరు</label>
                 <input
                   type="text"
                   className="form-input"
@@ -249,7 +246,7 @@ export default function CustomersPage() {
               </div>
 
               <div>
-                <label className="form-label">ఫోన్ నంబర్ / Phone Number *</label>
+                <label className="form-label">Phone Number / మొబైల్ *</label>
                 <input
                   type="tel"
                   required
@@ -262,7 +259,7 @@ export default function CustomersPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label className="form-label">క్రెడిట్ పరిమితి (Limit ₹)</label>
+                  <label className="form-label">Credit Limit (₹)</label>
                   <input
                     type="number"
                     className="form-input"
@@ -271,7 +268,7 @@ export default function CustomersPage() {
                   />
                 </div>
                 <div>
-                  <label className="form-label">ప్రారంభ బాకీ (Initial Due ₹)</label>
+                  <label className="form-label">Initial Balance Due (₹)</label>
                   <input
                     type="number"
                     className="form-input"
@@ -282,18 +279,18 @@ export default function CustomersPage() {
               </div>
 
               <div>
-                <label className="form-label">చిరునామా / Address</label>
+                <label className="form-label">Address / చిరునామా</label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="వీధి, ప్రాంతం"
+                  placeholder="Street, City"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 />
               </div>
 
               <div>
-                <label className="form-label">GSTIN (ఐచ్ఛికం)</label>
+                <label className="form-label">GSTIN (Optional)</label>
                 <input
                   type="text"
                   className="form-input"
@@ -305,10 +302,10 @@ export default function CustomersPage() {
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
                 <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setModalOpen(false)}>
-                  రద్దు చేయి
+                  Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
-                  భద్రపరచు (Save)
+                  Save Customer
                 </button>
               </div>
             </form>
