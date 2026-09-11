@@ -8,8 +8,15 @@ export default function ProductsPage() {
   const [products, setProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+
+  // Stock Inward Adjustment Modal State
+  const [inwardModalOpen, setInwardModalOpen] = useState(false);
+  const [selectedProductForInward, setSelectedProductForInward] = useState(null);
+  const [inwardQty, setInwardQty] = useState('');
+  const [inwardReason, setInwardReason] = useState('కొత్త స్టాక్ కొనుగోలు / Purchase Inward');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -19,6 +26,9 @@ export default function ProductsPage() {
     unit: 'pcs',
     unit_te: 'పీస్',
     selling_price: '',
+    cost_price: '',
+    current_stock: 0,
+    reorder_level: 5,
     gst_percent: 18,
     aliases: ''
   });
@@ -40,7 +50,8 @@ export default function ProductsPage() {
       p.name.toLowerCase().includes(q) ||
       (p.name_te && p.name_te.toLowerCase().includes(q)) ||
       (p.aliases && p.aliases.some(a => a.toLowerCase().includes(q)));
-    return matchesCat && matchesSearch;
+    const matchesLowStock = !showLowStockOnly || (p.current_stock || 0) <= (p.reorder_level || 5);
+    return matchesCat && matchesSearch && matchesLowStock;
   });
 
   const openAddModal = () => {
@@ -52,6 +63,9 @@ export default function ProductsPage() {
       unit: 'pcs',
       unit_te: 'పీస్',
       selling_price: '',
+      cost_price: '',
+      current_stock: 50,
+      reorder_level: 5,
       gst_percent: 18,
       aliases: ''
     });
@@ -67,10 +81,31 @@ export default function ProductsPage() {
       unit: p.unit || 'pcs',
       unit_te: p.unit_te || 'పీస్',
       selling_price: p.selling_price || '',
+      cost_price: p.cost_price || '',
+      current_stock: p.current_stock !== undefined ? p.current_stock : 0,
+      reorder_level: p.reorder_level !== undefined ? p.reorder_level : 5,
       gst_percent: p.gst_percent !== undefined ? p.gst_percent : 18,
       aliases: (p.aliases || []).join(', ')
     });
     setModalOpen(true);
+  };
+
+  const openInwardModal = (p) => {
+    setSelectedProductForInward(p);
+    setInwardQty('');
+    setInwardReason('కొత్త స్టాక్ కొనుగోలు / Purchase Inward');
+    setInwardModalOpen(true);
+  };
+
+  const handleInwardSubmit = (e) => {
+    e.preventDefault();
+    const delta = parseFloat(inwardQty);
+    if (!delta || isNaN(delta)) return;
+    if (selectedProductForInward) {
+      store.adjustStock(selectedProductForInward.id, delta, inwardReason);
+      setInwardModalOpen(false);
+      reloadProducts();
+    }
   };
 
   const handleSave = (e) => {
@@ -87,6 +122,9 @@ export default function ProductsPage() {
       unit: formData.unit.trim(),
       unit_te: formData.unit_te.trim(),
       selling_price: parseFloat(formData.selling_price) || 0,
+      cost_price: parseFloat(formData.cost_price) || 0,
+      current_stock: parseFloat(formData.current_stock) || 0,
+      reorder_level: parseFloat(formData.reorder_level) || 5,
       gst_percent: parseFloat(formData.gst_percent) || 0,
       aliases: cleanAliases
     };
@@ -132,18 +170,28 @@ export default function ProductsPage() {
         />
       </div>
 
-      {/* Category Filter Tabs */}
-      <div className="category-tabs">
+      {/* Category Filter Tabs & Low Stock Toggle */}
+      <div className="category-tabs" style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
         {categories.map(cat => (
           <div
             key={cat}
-            className={`cat-tab ${selectedCategory === cat ? 'active' : ''}`}
-            onClick={() => setSelectedCategory(cat)}
-            style={{ cursor: 'pointer' }}
+            className={`cat-tab ${selectedCategory === cat && !showLowStockOnly ? 'active' : ''}`}
+            onClick={() => {
+              setSelectedCategory(cat);
+              setShowLowStockOnly(false);
+            }}
+            style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             {cat}
           </div>
         ))}
+        <div
+          className={`cat-tab ${showLowStockOnly ? 'active' : ''}`}
+          onClick={() => setShowLowStockOnly(!showLowStockOnly)}
+          style={{ cursor: 'pointer', whiteSpace: 'nowrap', borderColor: '#fca5a5', background: showLowStockOnly ? '#fef2f2' : '#fff5f5', color: '#b91c1c', fontWeight: 700 }}
+        >
+          ⚠️ తక్కువ స్టాక్ (Low Stock)
+        </div>
       </div>
 
       {/* Products List */}
@@ -153,38 +201,139 @@ export default function ProductsPage() {
             ఉత్పత్తులు ఏవీ కనుగొనబడలేదు.
           </div>
         ) : (
-          filteredProducts.map(p => (
-            <div key={p.id} className="doc-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>{p.name}</div>
-                <div style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 600 }}>{p.name_te}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  <span style={{ background: 'var(--bg-subtle)', padding: '2px 6px', borderRadius: '4px' }}>{p.category}</span>
-                  • యూనిట్: <strong>{p.unit}</strong> ({p.unit_te || p.unit})
-                  • GST: <strong>{p.gst_percent}%</strong>
-                  • SKU: {p.sku || '-'}
-                </div>
-                {p.aliases && p.aliases.length > 0 && (
-                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '3px' }}>
-                    🗣️ Aliases: {p.aliases.slice(0, 4).join(', ')}
+          filteredProducts.map(p => {
+            const stock = p.current_stock !== undefined ? p.current_stock : 0;
+            const reorder = p.reorder_level || 5;
+            return (
+              <div key={p.id} className="doc-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ flex: 1, minWidth: '220px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>{p.name}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 600 }}>{p.name_te}</div>
+                    {/* Stock Badge */}
+                    {stock <= 0 ? (
+                      <span className="stock-tag-pill out-stock">❌ నిండుకుంది (0 {p.unit})</span>
+                    ) : stock <= reorder ? (
+                      <span className="stock-tag-pill low-stock">⚠️ తక్కువ స్టాక్: {stock} {p.unit}</span>
+                    ) : (
+                      <span className="stock-tag-pill in-stock">✓ స్టాక్: {stock} {p.unit}</span>
+                    )}
                   </div>
-                )}
-              </div>
-              <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px' }}>
-                <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--primary-dark)' }}>
-                  {documentGenerator.formatCurrency(p.selling_price)}
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    <span style={{ background: 'var(--bg-subtle)', padding: '2px 6px', borderRadius: '4px' }}>{p.category}</span>
+                    • యూనిట్: <strong>{p.unit}</strong> ({p.unit_te || p.unit})
+                    • GST: <strong>{p.gst_percent}%</strong>
+                    {p.cost_price > 0 && ` • కొనుగోలు: ₹${p.cost_price}`}
+                  </div>
+                  {p.aliases && p.aliases.length > 0 && (
+                    <div style={{ fontSize: '10px', color: '#64748b', marginTop: '3px' }}>
+                      🗣️ Aliases: {p.aliases.slice(0, 4).join(', ')}
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => openEditModal(p)}>✏️</button>
-                  <button type="button" className="btn btn-danger-outline btn-sm" onClick={() => handleDelete(p.id)}>🗑️</button>
+
+                <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 'auto' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--primary-dark)' }}>
+                    {documentGenerator.formatCurrency(p.selling_price)}
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      style={{ fontSize: '11px', padding: '4px 8px', color: 'var(--primary)', borderColor: 'var(--primary-border)', background: 'var(--primary-light)' }}
+                      onClick={() => openInwardModal(p)}
+                      title="Add or Adjust Stock"
+                    >
+                      + స్టాక్ ఇన్వర్డ్
+                    </button>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => openEditModal(p)}>✏️</button>
+                    <button type="button" className="btn btn-danger-outline btn-sm" onClick={() => handleDelete(p.id)}>🗑️</button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
-      {/* Product Modal */}
+      {/* Stock Inward Adjustment Modal */}
+      {inwardModalOpen && selectedProductForInward && (
+        <div className="modal-backdrop-overlay" onClick={() => setInwardModalOpen(false)}>
+          <div className="modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ fontSize: '17px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                📦 స్టాక్ ఇన్వర్డ్ సర్దుబాటు (Stock Inward)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setInwardModalOpen(false)}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleInwardSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}>
+                వస్తువు: <strong>{selectedProductForInward.name}</strong> ({selectedProductForInward.name_te})<br />
+                ప్రస్తుత నిల్వ: <strong>{selectedProductForInward.current_stock || 0} {selectedProductForInward.unit}</strong>
+              </div>
+
+              <div>
+                <label className="form-label">చేర్చాల్సిన పరిమాణం / Quantity to Add *</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    autoFocus
+                    className="form-input"
+                    placeholder="ఉదా: 50"
+                    value={inwardQty}
+                    onChange={(e) => setInwardQty(e.target.value)}
+                  />
+                  <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-secondary)' }}>
+                    {selectedProductForInward.unit}
+                  </span>
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  (స్టాక్ తగ్గించడానికి నెగెటివ్ సంఖ్య నమోదు చేయవచ్చు: e.g. -5)
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">కారణం / రిఫరెన్స్ (Reason / PO / Invoice No)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={inwardReason}
+                  onChange={(e) => setInwardReason(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ flex: 1 }}
+                  onClick={() => setInwardModalOpen(false)}
+                >
+                  రద్దు చేయి
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                >
+                  ✓ స్టాక్ అప్‌డేట్ చేయి
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Product Add / Edit Modal */}
       {modalOpen && (
         <div style={{
           position: 'fixed',
@@ -203,7 +352,7 @@ export default function ProductsPage() {
           <div style={{
             background: '#ffffff',
             borderRadius: '16px',
-            maxWidth: '500px',
+            maxWidth: '520px',
             width: '100%',
             padding: '24px',
             boxShadow: 'var(--shadow-card)',
@@ -274,7 +423,7 @@ export default function ProductsPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label className="form-label">ధర / Selling Price (₹) *</label>
+                  <label className="form-label">అమ్మకపు ధర / Selling Price (₹) *</label>
                   <input
                     type="number"
                     step="any"
@@ -285,15 +434,50 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div>
-                  <label className="form-label">GST శాతం (%)</label>
+                  <label className="form-label">కొనుగోలు ధర / Cost Price (₹)</label>
                   <input
                     type="number"
                     step="any"
                     className="form-input"
-                    value={formData.gst_percent}
-                    onChange={(e) => setFormData({ ...formData, gst_percent: e.target.value })}
+                    placeholder="లాభం లెక్కింపు కోసం"
+                    value={formData.cost_price}
+                    onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
                   />
                 </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label className="form-label">ప్రస్తుత స్టాక్ / Current Stock</label>
+                  <input
+                    type="number"
+                    step="any"
+                    className="form-input"
+                    value={formData.current_stock}
+                    onChange={(e) => setFormData({ ...formData, current_stock: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="form-label">రీ-ఆర్డర్ పరిమితి / Reorder Level</label>
+                  <input
+                    type="number"
+                    step="any"
+                    className="form-input"
+                    value={formData.reorder_level}
+                    onChange={(e) => setFormData({ ...formData, reorder_level: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">GST శాతం (%)</label>
+                <input
+                  type="number"
+                  step="any"
+                  className="form-input"
+                  value={formData.gst_percent}
+                  onChange={(e) => setFormData({ ...formData, gst_percent: e.target.value })}
+                />
               </div>
 
               <div>

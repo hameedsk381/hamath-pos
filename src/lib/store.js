@@ -1,9 +1,10 @@
 /**
  * Maatlaadi Bill - Local Data Store & Mock Auth Layer (Next.js Compatible)
  * Robust persistent storage with LocalStorage and fallback for SSR.
+ * Includes: Real-Time Stock Tracking, Khata / Customer Udhaar Ledger, and Multi-Mode Payments.
  */
 
-import { SEED_BUSINESS, SEED_CUSTOMERS, SEED_PRODUCTS } from './seed-data';
+import { SEED_BUSINESS, SEED_CUSTOMERS, SEED_PRODUCTS, SEED_PAYMENTS } from './seed-data';
 
 export const STORAGE_KEYS = {
   AUTH_USER: 'maatlaadi_auth_user',
@@ -12,6 +13,8 @@ export const STORAGE_KEYS = {
   CUSTOMERS: 'maatlaadi_customers',
   QUOTATIONS: 'maatlaadi_quotations',
   INVOICES: 'maatlaadi_invoices',
+  PAYMENTS: 'maatlaadi_payments',
+  STOCK_LOGS: 'maatlaadi_stock_logs',
   VOICE_TXS: 'maatlaadi_voice_transactions',
   SETTINGS: 'maatlaadi_settings',
   LAST_INV_NUM: 'maatlaadi_last_inv_num',
@@ -29,7 +32,7 @@ class DataStore {
   init() {
     if (typeof window === 'undefined') return;
 
-    // 1. Initialize Mock Auth & Business
+    // 1. Mock Auth & Business
     if (!this.get(STORAGE_KEYS.AUTH_USER)) {
       this.set(STORAGE_KEYS.AUTH_USER, {
         id: 'user-001',
@@ -46,13 +49,16 @@ class DataStore {
       this.set(STORAGE_KEYS.BUSINESS, SEED_BUSINESS);
     }
 
-    // 2. Initialize Products & merge newly added seed products with latest aliases
+    // 2. Initialize Products with stock tracking
     const existingProducts = this.get(STORAGE_KEYS.PRODUCTS) || [];
     const existingMap = new Map(existingProducts.map(p => [p.id, p]));
     const mergedProducts = [];
 
     SEED_PRODUCTS.forEach(sp => {
       const existing = existingMap.get(sp.id);
+      const defaultStock = sp.category === 'Cement' ? 120 : (sp.category === 'Grocery' ? 60 : 35);
+      const defaultCost = Math.round((sp.selling_price * 0.82) * 100) / 100;
+
       if (existing) {
         const mergedAliases = Array.from(new Set([
           ...(sp.aliases || []),
@@ -63,11 +69,19 @@ class DataStore {
           ...existing,
           aliases: mergedAliases,
           name_te: sp.name_te || existing.name_te,
-          unit_te: sp.unit_te || existing.unit_te
+          unit_te: sp.unit_te || existing.unit_te,
+          current_stock: existing.current_stock !== undefined ? existing.current_stock : defaultStock,
+          reorder_level: existing.reorder_level !== undefined ? existing.reorder_level : 10,
+          cost_price: existing.cost_price !== undefined ? existing.cost_price : defaultCost
         });
         existingMap.delete(sp.id);
       } else {
-        mergedProducts.push(sp);
+        mergedProducts.push({
+          ...sp,
+          current_stock: defaultStock,
+          reorder_level: 10,
+          cost_price: defaultCost
+        });
       }
     });
 
@@ -84,33 +98,55 @@ class DataStore {
           customProd.name_te = 'మినప గుళ్ళు (కేజీ)';
         }
       }
+      if (customProd.current_stock === undefined) customProd.current_stock = 30;
+      if (customProd.reorder_level === undefined) customProd.reorder_level = 5;
       mergedProducts.push(customProd);
     }
 
     this.set(STORAGE_KEYS.PRODUCTS, mergedProducts);
 
-    // 3. Initialize Customers
-    if (!this.get(STORAGE_KEYS.CUSTOMERS) || this.get(STORAGE_KEYS.CUSTOMERS).length === 0) {
+    // 3. Initialize Customers with Khata Balances
+    const existingCustomers = this.get(STORAGE_KEYS.CUSTOMERS) || [];
+    if (existingCustomers.length === 0) {
       this.set(STORAGE_KEYS.CUSTOMERS, SEED_CUSTOMERS);
+    } else {
+      // Ensure balance fields are present
+      const updatedCustomers = existingCustomers.map(c => {
+        const seed = SEED_CUSTOMERS.find(sc => sc.id === c.id);
+        return {
+          ...c,
+          current_balance: c.current_balance !== undefined ? c.current_balance : (seed?.current_balance || 0),
+          credit_limit: c.credit_limit !== undefined ? c.credit_limit : (seed?.credit_limit || 15000)
+        };
+      });
+      this.set(STORAGE_KEYS.CUSTOMERS, updatedCustomers);
     }
 
-    // 4. Initialize Quotations
-    if (!this.get(STORAGE_KEYS.QUOTATIONS) || this.get('mock_data_cleaned') !== 'v1') {
+    // 4. Initialize Payments / Khata Ledger
+    if (!this.get(STORAGE_KEYS.PAYMENTS)) {
+      this.set(STORAGE_KEYS.PAYMENTS, SEED_PAYMENTS);
+    }
+
+    // 5. Initialize Stock Logs
+    if (!this.get(STORAGE_KEYS.STOCK_LOGS)) {
+      this.set(STORAGE_KEYS.STOCK_LOGS, []);
+    }
+
+    // 6. Initialize Quotations & Invoices
+    if (!this.get(STORAGE_KEYS.QUOTATIONS) || this.get('mock_data_cleaned') !== 'v2') {
       this.set(STORAGE_KEYS.QUOTATIONS, []);
     }
-
-    // 5. Initialize Invoices
-    if (!this.get(STORAGE_KEYS.INVOICES) || this.get('mock_data_cleaned') !== 'v1') {
+    if (!this.get(STORAGE_KEYS.INVOICES) || this.get('mock_data_cleaned') !== 'v2') {
       this.set(STORAGE_KEYS.INVOICES, []);
-      this.set('mock_data_cleaned', 'v1');
+      this.set('mock_data_cleaned', 'v2');
     }
 
-    // 6. Initialize Voice Transactions Log
+    // 7. Voice Transactions Log
     if (!this.get(STORAGE_KEYS.VOICE_TXS)) {
       this.set(STORAGE_KEYS.VOICE_TXS, []);
     }
 
-    // 7. Initialize Settings
+    // 8. Settings
     if (!this.get(STORAGE_KEYS.SETTINGS) || this.get(STORAGE_KEYS.SETTINGS).demo_mode === true) {
       const current = this.get(STORAGE_KEYS.SETTINGS) || {};
       this.set(STORAGE_KEYS.SETTINGS, {
@@ -160,6 +196,8 @@ class DataStore {
       localStorage.removeItem(STORAGE_KEYS.CUSTOMERS);
       localStorage.removeItem(STORAGE_KEYS.QUOTATIONS);
       localStorage.removeItem(STORAGE_KEYS.INVOICES);
+      localStorage.removeItem(STORAGE_KEYS.PAYMENTS);
+      localStorage.removeItem(STORAGE_KEYS.STOCK_LOGS);
       localStorage.removeItem(STORAGE_KEYS.VOICE_TXS);
     }
     this.memoryFallback = {};
@@ -193,7 +231,7 @@ class DataStore {
     return updated;
   }
 
-  // --- Products ---
+  // --- Products & Inventory ---
   getProducts() {
     return this.get(STORAGE_KEYS.PRODUCTS) || SEED_PRODUCTS;
   }
@@ -211,6 +249,9 @@ class DataStore {
     const newProduct = {
       ...product,
       id: product.id || 'prod-' + Date.now(),
+      current_stock: product.current_stock !== undefined ? parseFloat(product.current_stock) : 40,
+      reorder_level: product.reorder_level !== undefined ? parseFloat(product.reorder_level) : 10,
+      cost_price: product.cost_price !== undefined ? parseFloat(product.cost_price) : Math.round(parseFloat(product.selling_price || 0) * 0.8),
       created_at: new Date().toISOString(),
       is_active: product.is_active !== false
     };
@@ -236,7 +277,40 @@ class DataStore {
     return true;
   }
 
-  // --- Customers ---
+  adjustStock(productId, deltaQuantity, reason = 'Stock adjustment') {
+    const products = this.getProducts();
+    const idx = products.findIndex(p => p.id === productId);
+    if (idx === -1) return null;
+
+    const oldStock = products[idx].current_stock || 0;
+    const newStock = Math.max(0, Math.round((oldStock + deltaQuantity) * 100) / 100);
+    products[idx].current_stock = newStock;
+    products[idx].updated_at = new Date().toISOString();
+    this.set(STORAGE_KEYS.PRODUCTS, products);
+
+    // Log stock change
+    const logs = this.get(STORAGE_KEYS.STOCK_LOGS) || [];
+    logs.unshift({
+      id: 'stk-' + Date.now(),
+      product_id: productId,
+      product_name: products[idx].name,
+      old_stock: oldStock,
+      delta: deltaQuantity,
+      new_stock: newStock,
+      reason,
+      date: new Date().toISOString()
+    });
+    if (logs.length > 200) logs.length = 200;
+    this.set(STORAGE_KEYS.STOCK_LOGS, logs);
+
+    return products[idx];
+  }
+
+  getStockLogs() {
+    return this.get(STORAGE_KEYS.STOCK_LOGS) || [];
+  }
+
+  // --- Customers & Khata (Udhaar) Ledger ---
   getCustomers() {
     return this.get(STORAGE_KEYS.CUSTOMERS) || SEED_CUSTOMERS;
   }
@@ -250,6 +324,8 @@ class DataStore {
     const newCustomer = {
       ...customer,
       id: customer.id || 'cust-' + Date.now(),
+      current_balance: parseFloat(customer.current_balance) || 0,
+      credit_limit: parseFloat(customer.credit_limit) || 15000,
       created_at: new Date().toISOString()
     };
     customers.unshift(newCustomer);
@@ -266,6 +342,104 @@ class DataStore {
       return customers[idx];
     }
     return null;
+  }
+
+  updateCustomerBalance(customerId, deltaAmount) {
+    const customers = this.getCustomers();
+    const idx = customers.findIndex(c => c.id === customerId);
+    if (idx !== -1) {
+      const oldBal = customers[idx].current_balance || 0;
+      const newBal = Math.round((oldBal + deltaAmount) * 100) / 100;
+      customers[idx].current_balance = newBal;
+      this.set(STORAGE_KEYS.CUSTOMERS, customers);
+      return newBal;
+    }
+    return 0;
+  }
+
+  // Payments / Receipts
+  getPayments() {
+    return this.get(STORAGE_KEYS.PAYMENTS) || [];
+  }
+
+  recordPayment({ customerId, amount, paymentMode = 'cash', reference = '', notes = '', date = null }) {
+    const payments = this.getPayments();
+    const customer = this.getCustomerById(customerId);
+    const amt = parseFloat(amount) || 0;
+
+    const paymentRecord = {
+      id: 'pay-' + Date.now(),
+      customer_id: customerId,
+      customer_name: customer ? customer.name : 'Customer',
+      amount: amt,
+      payment_mode: paymentMode,
+      reference,
+      notes,
+      date: date || new Date().toISOString().split('T')[0],
+      created_at: new Date().toISOString()
+    };
+
+    payments.unshift(paymentRecord);
+    this.set(STORAGE_KEYS.PAYMENTS, payments);
+
+    // Decrease customer's credit balance
+    if (customerId) {
+      this.updateCustomerBalance(customerId, -amt);
+    }
+
+    return paymentRecord;
+  }
+
+  getCustomerLedger(customerId) {
+    const invoices = this.getInvoices().filter(i => i.customer_id === customerId);
+    const payments = this.getPayments().filter(p => p.customer_id === customerId);
+
+    const entries = [];
+
+    invoices.forEach(inv => {
+      entries.push({
+        id: inv.id,
+        date: inv.date || inv.created_at?.split('T')[0],
+        type: 'invoice',
+        type_label: 'ఇన్వాయిస్ (Bill)',
+        reference: inv.invoice_number,
+        debit: inv.total,       // Customer owes this
+        credit: 0,
+        payment_mode: inv.payment_mode || 'credit',
+        notes: inv.notes || '',
+        timestamp: new Date(inv.date || inv.created_at).getTime()
+      });
+    });
+
+    payments.forEach(pay => {
+      entries.push({
+        id: pay.id,
+        date: pay.date,
+        type: 'payment',
+        type_label: 'చెల్లింపు (Payment Received)',
+        reference: pay.reference || 'REC-' + pay.id.slice(-4),
+        debit: 0,
+        credit: pay.amount,     // Customer paid this
+        payment_mode: pay.payment_mode,
+        notes: pay.notes || '',
+        timestamp: new Date(pay.date).getTime()
+      });
+    });
+
+    // Sort chronologically ascending to compute running balance
+    entries.sort((a, b) => a.timestamp - b.timestamp);
+
+    let running = 0;
+    const ledger = entries.map(e => {
+      running += (e.debit - e.credit);
+      return {
+        ...e,
+        balance_after: Math.round(running * 100) / 100
+      };
+    });
+
+    // Return in reverse chronological order for UI display
+    return ledger.reverse();
   }
 
   // --- Numbering System ---
@@ -331,36 +505,50 @@ class DataStore {
 
   saveInvoice(invoice) {
     const invoices = this.getInvoices();
-    if (invoice.id) {
-      const idx = invoices.findIndex(i => i.id === invoice.id);
-      if (idx !== -1) {
-        invoices[idx] = { ...invoices[idx], ...invoice, updated_at: new Date().toISOString() };
-        this.set(STORAGE_KEYS.INVOICES, invoices);
-        return invoices[idx];
-      }
-    }
+    const isNew = !invoice.id || !invoices.some(i => i.id === invoice.id);
+
+    const invoiceNumber = invoice.invoice_number || this.getNextInvoiceNumber();
+    const paymentMode = invoice.payment_mode || 'cash';
+    const paymentStatus = invoice.payment_status || (paymentMode === 'credit' ? 'credit' : 'paid');
+
     const newInvoice = {
       ...invoice,
       id: invoice.id || 'inv-' + Date.now(),
-      invoice_number: invoice.invoice_number || this.getNextInvoiceNumber(),
+      invoice_number: invoiceNumber,
       date: invoice.date || new Date().toISOString().split('T')[0],
       created_at: new Date().toISOString(),
-      payment_status: invoice.payment_status || 'paid'
+      payment_mode: paymentMode,
+      payment_status: paymentStatus
     };
-    invoices.unshift(newInvoice);
+
+    if (isNew) {
+      invoices.unshift(newInvoice);
+
+      // 1. Auto-decrement Inventory Stock
+      if (Array.isArray(newInvoice.items)) {
+        for (const it of newInvoice.items) {
+          if (it.product_id) {
+            this.adjustStock(it.product_id, -(parseFloat(it.quantity) || 0), `Sale: ${invoiceNumber}`);
+          }
+        }
+      }
+
+      // 2. Update Customer Khata Balance if Credit
+      if (newInvoice.customer_id && (paymentMode === 'credit' || paymentStatus === 'credit')) {
+        this.updateCustomerBalance(newInvoice.customer_id, newInvoice.total);
+      } else if (newInvoice.customer_id && paymentStatus === 'partial') {
+        const unpaid = newInvoice.total - (parseFloat(newInvoice.amount_paid) || 0);
+        if (unpaid > 0) {
+          this.updateCustomerBalance(newInvoice.customer_id, unpaid);
+        }
+      }
+    } else {
+      const idx = invoices.findIndex(i => i.id === invoice.id);
+      invoices[idx] = { ...invoices[idx], ...newInvoice, updated_at: new Date().toISOString() };
+    }
+
     this.set(STORAGE_KEYS.INVOICES, invoices);
     return newInvoice;
-  }
-
-  updateInvoice(id, updates) {
-    const invoices = this.getInvoices();
-    const idx = invoices.findIndex(i => i.id === id);
-    if (idx !== -1) {
-      invoices[idx] = { ...invoices[idx], ...updates, updated_at: new Date().toISOString() };
-      this.set(STORAGE_KEYS.INVOICES, invoices);
-      return invoices[idx];
-    }
-    return null;
   }
 
   convertQuotationToInvoice(quotationId) {
@@ -371,6 +559,7 @@ class DataStore {
     const invoice = {
       quotation_id: quotation.id,
       customer_id: quotation.customer_id,
+      customer_name: quotation.customer_name,
       customer_name_snapshot: quotation.customer_name_snapshot,
       customer_phone_snapshot: quotation.customer_phone_snapshot,
       customer_gstin_snapshot: quotation.customer_gstin_snapshot || '',

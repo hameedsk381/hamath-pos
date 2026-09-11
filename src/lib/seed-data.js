@@ -31,7 +31,9 @@ const SEED_CUSTOMERS = [
     address: 'గాంధీ నగర్, విజయవాడ',
     gstin: '',
     city: 'Vijayawada',
-    notes: 'రెగ్యులర్ రిటైల్ కస్టమర్'
+    notes: 'రెగ్యులర్ రిటైల్ కస్టమర్',
+    current_balance: 3250.00,
+    credit_limit: 15000.00
   },
   {
     id: 'cust-002',
@@ -41,7 +43,9 @@ const SEED_CUSTOMERS = [
     address: 'భవానీపురం, విజయవాడ',
     gstin: '37BCDEF1234F1Z8',
     city: 'Vijayawada',
-    notes: 'కాంట్రాక్టర్ - క్రెడిట్ కస్టమర్'
+    notes: 'కాంట్రాక్టర్ - క్రెడిట్ కస్టమర్',
+    current_balance: 8400.00,
+    credit_limit: 25000.00
   },
   {
     id: 'cust-003',
@@ -51,7 +55,9 @@ const SEED_CUSTOMERS = [
     address: 'గుంటూరు బైపాస్ రోడ్డు, తాడేపల్లి',
     gstin: '37GHIJK5678J1Z2',
     city: 'Guntur',
-    notes: 'హోల్‌సేల్ ఆర్డర్స్'
+    notes: 'హోల్‌సేల్ ఆర్డర్స్',
+    current_balance: 24500.00,
+    credit_limit: 100000.00
   },
   {
     id: 'cust-004',
@@ -61,7 +67,9 @@ const SEED_CUSTOMERS = [
     address: 'బెంజ్ సర్కిల్, విజయవాడ',
     gstin: '37LMNOP9012N1Z4',
     city: 'Vijayawada',
-    notes: 'కమర్షియల్ బిల్డర్'
+    notes: 'కమర్షియల్ బిల్డర్',
+    current_balance: 15800.00,
+    credit_limit: 50000.00
   },
   {
     id: 'cust-005',
@@ -71,7 +79,9 @@ const SEED_CUSTOMERS = [
     address: 'సత్యనారాయణపురం, విజయవాడ',
     gstin: '',
     city: 'Vijayawada',
-    notes: 'చిన్న కాంట్రాక్టర్'
+    notes: 'చిన్న కాంట్రాక్టర్',
+    current_balance: 1200.00,
+    credit_limit: 10000.00
   },
   {
     id: 'cust-006',
@@ -81,7 +91,9 @@ const SEED_CUSTOMERS = [
     address: 'మొగల్రాజపురం, విజయవాడ',
     gstin: '',
     city: 'Vijayawada',
-    notes: 'పెయింటర్ / వర్కర్'
+    notes: 'పెయింటర్ / వర్కర్',
+    current_balance: 0.00,
+    credit_limit: 5000.00
   }
 ];
 
@@ -615,6 +627,29 @@ const SEED_QUOTATIONS = [];
 
 const SEED_INVOICES = [];
 
+const SEED_PAYMENTS = [
+  {
+    id: 'pay-001',
+    customer_id: 'cust-001',
+    customer_name: 'Ramesh',
+    amount: 1500.00,
+    payment_mode: 'upi',
+    reference: 'UPI/62819283719',
+    notes: 'Google Pay transfer',
+    date: '2026-09-10'
+  },
+  {
+    id: 'pay-002',
+    customer_id: 'cust-002',
+    customer_name: 'Suresh',
+    amount: 5000.00,
+    payment_mode: 'cash',
+    reference: '',
+    notes: 'నగదు చెల్లింపు (Cash deposit)',
+    date: '2026-09-08'
+  }
+];
+
 const DEMO_SCENARIOS = [];
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -624,8 +659,9 @@ if (typeof module !== 'undefined' && module.exports) {
     SEED_PRODUCTS,
     SEED_QUOTATIONS,
     SEED_INVOICES,
+    SEED_PAYMENTS,
     DEMO_SCENARIOS
   };
 }
 
-export { SEED_BUSINESS, SEED_CUSTOMERS, SEED_PRODUCTS, SEED_QUOTATIONS, SEED_INVOICES, DEMO_SCENARIOS };
+export { SEED_BUSINESS, SEED_CUSTOMERS, SEED_PRODUCTS, SEED_QUOTATIONS, SEED_INVOICES, SEED_PAYMENTS, DEMO_SCENARIOS };

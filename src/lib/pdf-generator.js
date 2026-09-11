@@ -18,11 +18,28 @@ export class DocumentGenerator {
     });
   }
 
+  getUpiQrUrl(amount, invoiceNumber) {
+    const biz = this.store.getBusiness();
+    const upiId = biz.upi_id || '9849012345@ybl';
+    const payeeName = biz.name || 'Store';
+    const note = invoiceNumber ? `Bill-${invoiceNumber}` : 'Payment';
+    const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${parseFloat(amount || 0).toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}`;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&data=${encodeURIComponent(upiUri)}`;
+  }
+
   renderDocumentHtml(doc, isInvoice = true) {
     const biz = this.store.getBusiness();
     const docTitle = isInvoice ? 'టాక్స్ ఇన్వాయిస్ / TAX INVOICE' : 'కొటేషన్ / QUOTATION';
     const docNumber = isInvoice ? doc.invoice_number : doc.quotation_number;
     const isQuotation = !isInvoice;
+    const upiQrUrl = this.getUpiQrUrl(doc.total, docNumber);
+
+    // Customer balance context
+    let customerBalance = 0;
+    if (doc.customer_id) {
+      const cust = this.store.getCustomer(doc.customer_id);
+      if (cust) customerBalance = cust.current_balance || 0;
+    }
 
     let itemsRows = '';
     (doc.items || []).forEach((item, index) => {
@@ -66,7 +83,7 @@ export class DocumentGenerator {
         </div>
 
         <!-- Customer & Bill Meta -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; background: #f9fafb; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #f3f4f6;">
+        <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; background: #f9fafb; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #f3f4f6;">
           <div>
             <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #6b7280; margin-bottom: 4px;">కస్టమర్ వివరాలు / Bill To:</div>
             <div style="font-size: 15px; font-weight: 700; color: #111827;">${doc.customer_name_snapshot || doc.customer_name || 'Cash Customer'}</div>
@@ -75,8 +92,13 @@ export class DocumentGenerator {
             ${doc.customer_gstin_snapshot || doc.customer_gstin ? `<div style="font-size: 12px; color: #047857; font-weight: 600;">GSTIN: ${doc.customer_gstin_snapshot || doc.customer_gstin}</div>` : ''}
           </div>
           <div style="text-align: right; display: flex; flex-direction: column; justify-content: center;">
-            <div style="font-size: 12px; color: #6b7280;">స్టేటస్ / Status: <strong style="color: #059669; text-transform: uppercase;">${doc.status || (isInvoice ? 'PAID' : 'CONFIRMED')}</strong></div>
-            ${doc.payment_mode ? `<div style="font-size: 12px; color: #6b7280;">చెల్లింపు విధానం / Mode: <strong>${doc.payment_mode.toUpperCase()}</strong></div>` : ''}
+            <div style="font-size: 12px; color: #6b7280;">స్టేటస్ / Status: <strong style="color: ${doc.payment_mode === 'credit' ? '#b45309' : '#059669'}; text-transform: uppercase;">${doc.payment_mode === 'credit' ? 'బాకీ / CREDIT' : (doc.status || 'PAID')}</strong></div>
+            <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">చెల్లింపు విధానం / Mode: <strong style="color: #111827;">${(doc.payment_mode || 'cash').toUpperCase()}</strong></div>
+            ${customerBalance > 0 ? `
+              <div style="margin-top: 6px; padding: 4px 8px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; display: inline-block;">
+                <span style="font-size: 11px; color: #b91c1c; font-weight: 700;">ఖాతా బాకీ / Total Balance: ${this.formatCurrency(customerBalance)}</span>
+              </div>
+            ` : ''}
           </div>
         </div>
 
@@ -98,15 +120,21 @@ export class DocumentGenerator {
           </tbody>
         </table>
 
-        <!-- Totals & Bank Section -->
+        <!-- Totals & Bank & Dynamic UPI QR Section -->
         <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; border-top: 1px solid #e5e7eb; padding-top: 16px;">
           <div>
-            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 12px; font-size: 11px; color: #166534;">
-              <div style="font-weight: 700; margin-bottom: 4px; font-size: 12px;">బ్యాంక్ & చెల్లింపు వివరాలు / Bank Details:</div>
-              <div><strong>బ్యాంక్ / Bank:</strong> ${biz.bank_name}</div>
-              <div><strong>ఖాతా నం / A/c No:</strong> ${biz.bank_account_no}</div>
-              <div><strong>IFSC Code:</strong> ${biz.bank_ifsc}</div>
-              <div><strong>UPI ID:</strong> ${biz.upi_id}</div>
+            <div style="display: flex; gap: 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 12px;">
+              <div style="text-align: center; flex-shrink: 0;">
+                <img src="${upiQrUrl}" alt="UPI QR Code" style="width: 96px; height: 96px; border-radius: 4px; border: 1px solid #86efac; display: block;" />
+                <span style="font-size: 9px; font-weight: 700; color: #166534; display: block; margin-top: 4px;">SCAN & PAY UPI</span>
+              </div>
+              <div style="font-size: 11px; color: #166534; line-height: 1.5;">
+                <div style="font-weight: 700; margin-bottom: 2px; font-size: 12px;">బ్యాంక్ & UPI వివరాలు:</div>
+                <div><strong>UPI ID:</strong> <span style="font-family: monospace; font-weight: 700;">${biz.upi_id}</span></div>
+                <div><strong>బ్యాంక్:</strong> ${biz.bank_name}</div>
+                <div><strong>A/c:</strong> ${biz.bank_account_no}</div>
+                <div><strong>IFSC:</strong> ${biz.bank_ifsc}</div>
+              </div>
             </div>
             ${doc.notes ? `<div style="margin-top: 10px; font-size: 11px; color: #6b7280;"><strong>గమనిక / Notes:</strong> ${doc.notes}</div>` : ''}
           </div>
@@ -158,6 +186,67 @@ export class DocumentGenerator {
     `;
   }
 
+  renderThermalHtml(doc) {
+    const biz = this.store.getBusiness();
+    const upiQrUrl = this.getUpiQrUrl(doc.total, doc.invoice_number);
+
+    let itemsRows = '';
+    (doc.items || []).forEach((item, index) => {
+      itemsRows += `
+        <div style="margin-bottom: 6px; font-size: 12px; border-bottom: 1px dotted #e5e7eb; padding-bottom: 4px;">
+          <div style="font-weight: 600; color: #111;">${index + 1}. ${item.product_name_snapshot || item.name}</div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: #4b5563; margin-top: 2px;">
+            <span>${item.quantity} ${item.unit} x ${this.formatCurrency(item.unit_price)}</span>
+            <span style="font-weight: 700; color: #111;">${this.formatCurrency(item.line_total)}</span>
+          </div>
+        </div>
+      `;
+    });
+
+    return `
+      <div style="width: 280px; margin: 0 auto; padding: 12px; font-family: 'Courier New', Courier, monospace; color: #000; background: #fff;">
+        <div style="text-align: center; border-bottom: 1px dashed #000; padding-bottom: 8px; margin-bottom: 8px;">
+          <div style="font-size: 16px; font-weight: 900;">${biz.name}</div>
+          <div style="font-size: 12px;">${biz.name_te}</div>
+          <div style="font-size: 10px; margin-top: 2px;">${biz.city} | Ph: ${biz.phone}</div>
+          <div style="font-size: 10px;">GSTIN: ${biz.gstin}</div>
+        </div>
+
+        <div style="font-size: 11px; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 6px;">
+          <div>Bill: <strong>${doc.invoice_number || 'RECEIPT'}</strong></div>
+          <div>Date: ${doc.date}</div>
+          <div>Customer: ${doc.customer_name_snapshot || doc.customer_name || 'Cash'}</div>
+          <div>Mode: <strong>${(doc.payment_mode || 'Cash').toUpperCase()}</strong></div>
+        </div>
+
+        <div style="margin-bottom: 8px;">
+          ${itemsRows}
+        </div>
+
+        <div style="border-top: 1px dashed #000; padding-top: 6px; font-size: 12px;">
+          <div style="display: flex; justify-content: space-between;"><span>Subtotal:</span><span>${this.formatCurrency(doc.subtotal)}</span></div>
+          ${doc.discount_amount > 0 ? `<div style="display: flex; justify-content: space-between;"><span>Discount:</span><span>-${this.formatCurrency(doc.discount_amount)}</span></div>` : ''}
+          <div style="display: flex; justify-content: space-between;"><span>GST:</span><span>${this.formatCurrency(doc.gst_amount)}</span></div>
+          <div style="display: flex; justify-content: space-between; font-size: 15px; font-weight: 900; margin-top: 4px; border-top: 1px solid #000; padding-top: 4px;">
+            <span>TOTAL:</span>
+            <span>${this.formatCurrency(doc.total)}</span>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 12px; padding-top: 8px; border-top: 1px dashed #000;">
+          <img src="${upiQrUrl}" alt="UPI QR" style="width: 110px; height: 110px; display: inline-block; margin: 0 auto;" />
+          <div style="font-size: 10px; margin-top: 4px; font-weight: 700;">SCAN WITH ANY UPI APP</div>
+          <div style="font-size: 9px; color: #555;">UPI: ${biz.upi_id}</div>
+        </div>
+
+        <div style="text-align: center; font-size: 10px; margin-top: 12px;">
+          ధన్యవాదములు! Visit Again 🙏<br>
+          <em>Maatlaadi Bill</em>
+        </div>
+      </div>
+    `;
+  }
+
   printDocument(doc, isInvoice = true) {
     if (typeof window === 'undefined') return;
     const printWindow = window.open('', '_blank');
@@ -194,6 +283,39 @@ export class DocumentGenerator {
     printWindow.document.close();
   }
 
+  printThermal(doc) {
+    if (typeof window === 'undefined') return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const docHtml = this.renderThermalHtml(doc);
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Receipt - ${doc.invoice_number || 'Slip'}</title>
+          <style>
+            body { margin: 0; padding: 10px; font-family: monospace; }
+            @media print {
+              body { padding: 0; margin: 0; }
+              @page { size: 80mm auto; margin: 2mm; }
+            }
+          </style>
+        </head>
+        <body>
+          ${docHtml}
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 400);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  }
+
   downloadPdf(doc, isInvoice = true) {
     this.printDocument(doc, isInvoice);
   }
@@ -211,6 +333,10 @@ export class DocumentGenerator {
       itemLines += `\n${idx + 1}. *${name}* - ${item.quantity} ${item.unit} @ ${this.formatCurrency(item.unit_price)}`;
     });
 
+    const paymentInfo = doc.payment_mode === 'credit'
+      ? '⚠️ *చెల్లింపు / Mode: బాకీ / Udhaar Khata*'
+      : `✅ *చెల్లింపు / Mode: ${(doc.payment_mode || 'Cash').toUpperCase()}*`;
+
     const message =
 `🧾 *${biz.name}*
 ${biz.name_te}
@@ -220,6 +346,7 @@ ${biz.city} | Ph: ${biz.phone}
 🔢 నంబర్ / No: *${docNum}*
 📅 తేదీ / Date: *${doc.date}*
 👤 కస్టమర్ / To: *${custName}*
+${paymentInfo}
 ━━━━━━━━━━━━━━━━━━
 *వస్తువులు / Items:*${itemLines}
 ━━━━━━━━━━━━━━━━━━
@@ -227,7 +354,10 @@ ${biz.city} | Ph: ${biz.phone}
 ${doc.discount_amount > 0 ? `🏷️ *డిస్కౌంట్ / Discount:* -${this.formatCurrency(doc.discount_amount)}\n` : ''}🏛️ *GST:* ${this.formatCurrency(doc.gst_amount)}
 💰 *మొత్తం / Grand Total: ${this.formatCurrency(doc.total)}*
 ━━━━━━━━━━━━━━━━━━
-📲 *UPI Payment:* \`${biz.upi_id}\`
+📲 *UPI Payment Link:*
+upi://pay?pa=${biz.upi_id}&pn=${encodeURIComponent(biz.name)}&am=${doc.total.toFixed(2)}&cu=INR
+ID: \`${biz.upi_id}\`
+
 ధన్యవాదములు! Visit Again 🙏
 _Generated via Maatlaadi Bill - మాట్లాడితే బిల్ రెడీ_`;
 

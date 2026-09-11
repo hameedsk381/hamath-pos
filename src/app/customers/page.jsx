@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { store } from '@/lib/store';
+import { documentGenerator } from '@/lib/pdf-generator';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState([]);
@@ -16,6 +18,8 @@ export default function CustomersPage() {
     address: '',
     gstin: '',
     city: 'Vijayawada',
+    credit_limit: 10000,
+    current_balance: 0,
     notes: ''
   });
 
@@ -47,6 +51,8 @@ export default function CustomersPage() {
       address: '',
       gstin: '',
       city: 'Vijayawada',
+      credit_limit: 10000,
+      current_balance: 0,
       notes: ''
     });
     setModalOpen(true);
@@ -61,6 +67,8 @@ export default function CustomersPage() {
       address: c.address || '',
       gstin: c.gstin || '',
       city: c.city || 'Vijayawada',
+      credit_limit: c.credit_limit || 10000,
+      current_balance: c.current_balance || 0,
       notes: c.notes || ''
     });
     setModalOpen(true);
@@ -75,6 +83,8 @@ export default function CustomersPage() {
       address: formData.address.trim(),
       gstin: formData.gstin.trim(),
       city: formData.city.trim(),
+      credit_limit: parseFloat(formData.credit_limit) || 10000,
+      current_balance: parseFloat(formData.current_balance) || 0,
       notes: formData.notes.trim()
     };
 
@@ -93,7 +103,7 @@ export default function CustomersPage() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
-          <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>కస్టమర్ల డైరెక్టరీ (Customers)</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>కస్టమర్ల డైరెక్టరీ & ఖాటా (Customers & Khata)</h2>
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{filteredCustomers.length} కస్టమర్లు నమోదు చేయబడ్డారు</div>
         </div>
         <button className="btn btn-primary btn-sm" onClick={openAddModal}>
@@ -119,17 +129,39 @@ export default function CustomersPage() {
             కస్టమర్లు ఎవరూ కనుగొనబడలేదు.
           </div>
         ) : (
-          filteredCustomers.map(c => (
-            <div key={c.id} className="doc-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          filteredCustomers.map(c => {
+            const bal = c.current_balance || 0;
+            return (
+              <div key={c.id} className="doc-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>{c.name}</div>
-                  {c.name_te && <div style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 600 }}>{c.name_te}</div>}
-                  {c.phone && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' }}>📞 {c.phone}</div>}
-                  {c.address && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>📍 {c.address}</div>}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>{c.name}</div>
+                    {c.name_te && <div style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 600 }}>({c.name_te})</div>}
+                    {bal > 0 ? (
+                      <span style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '4px' }}>
+                        ⚠️ బాకీ: {documentGenerator.formatCurrency(bal)}
+                      </span>
+                    ) : (
+                      <span style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px' }}>
+                        ✓ క్లియర్ (₹0 Due)
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    📞 {c.phone} {c.address ? `• 📍 ${c.address}` : ''}
+                  </div>
                   {c.gstin && <div style={{ fontSize: '11px', color: '#0284c7', fontWeight: 600, marginTop: '2px' }}>GSTIN: {c.gstin}</div>}
                 </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Link
+                    href={`/customer/${c.id}`}
+                    className="btn btn-outline btn-sm"
+                    style={{ fontWeight: 700, color: 'var(--primary)', borderColor: 'var(--primary-border)', background: 'var(--primary-light)' }}
+                  >
+                    📖 ఖాతా లెడ్జర్ (Khata)
+                  </Link>
+
                   {c.phone && (
                     <>
                       <a href={`tel:${c.phone}`} className="btn btn-outline btn-sm" style={{ padding: '4px 8px' }} title="Call">📞</a>
@@ -150,8 +182,8 @@ export default function CustomersPage() {
                   </button>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -226,6 +258,27 @@ export default function CustomersPage() {
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label className="form-label">క్రెడిట్ పరిమితి (Limit ₹)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={formData.credit_limit}
+                    onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="form-label">ప్రారంభ బాకీ (Initial Due ₹)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={formData.current_balance}
+                    onChange={(e) => setFormData({ ...formData, current_balance: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div>
