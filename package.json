@@ -1,0 +1,29 @@
+{
+  "name": "maatlaadi-bill",
+  "version": "1.0.0",
+  "description": "Telugu-first voice-powered quotation & invoice generator for retail and wholesale businesses in Andhra Pradesh",
+  "main": "server.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "keywords": [
+    "telugu",
+    "voice-billing",
+    "retail",
+    "andhra-pradesh",
+    "invoice",
+    "quotation",
+    "gemini-ai",
+    "speech-to-bill"
+  ],
+  "author": "Maatlaadi Bill Team",
+  "license": "MIT",
+  "dependencies": {
+    "@next/swc-win32-x64-msvc": "^16.3.4",
+    "next": "^16.3.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
+}

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Maatlaadi Bill - మాట్లాడితే బిల్ రెడీ | Telugu Voice Billing</title>
+  <meta name="description" content="Telugu-first voice-powered quotation & invoice generator for small retail and wholesale businesses in Andhra Pradesh.">
+  <meta name="theme-color" content="#059669">
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Typography: Inter + Noto Sans Telugu for state-of-the-art Telugu rendering -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Telugu:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Core Design System -->
+  <link rel="stylesheet" href="/css/style.css?v=1.0.6">
+</head>
+<body>
+
+  <div id="app">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-section" onclick="window.App.navigateTo('home')">
+        <div class="brand-icon">🎙️</div>
+        <div>
+          <div class="brand-title">Maatlaadi Bill</div>
+          <div class="brand-subtitle">మాట్లాడితే బిల్ రెడీ</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="header-status-pill">
+          <span class="pulse-dot"></span>
+          <span>AI ఆన్‌లైన్</span>
+        </div>
+        <button class="btn btn-outline btn-sm" style="border-radius: 20px; font-size: 11px; padding: 4px 10px;" onclick="window.App.navigateTo('settings')">
+          ⚙️ సెట్టింగ్స్
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Dynamic View Container -->
+    <main id="app-view-container">
+      <!-- Dynamic Views inject here -->
+    </main>
+
+    <!-- Bottom Navigation Bar (Mobile-First Touch Navigation) -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-view="home">
+        <span class="nav-icon">🎙️</span>
+        <span class="nav-label">వాయిస్</span>
+      </button>
+      <button class="nav-item" data-view="products">
+        <span class="nav-icon">📦</span>
+        <span class="nav-label">కేటలాగ్</span>
+      </button>
+      <button class="nav-item" data-view="customers">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">కస్టమర్లు</span>
+      </button>
+      <button class="nav-item" data-view="documents">
+        <span class="nav-icon">📄</span>
+        <span class="nav-label">బిల్లులు</span>
+      </button>
+      <button class="nav-item" data-view="settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">సెట్టింగ్స్</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="/js/seed-data.js"></script>
+  <script src="/js/store.js"></script>
+  <script src="/js/matcher.js"></script>
+  <script src="/js/conversational.js"></script>
+  <script src="/js/voice.js"></script>
+  <script src="/js/gemini.js"></script>
+  <script src="/js/pdf-generator.js"></script>
+
+  <!-- Views -->
+  <script src="/js/views/home.js"></script>
+  <script src="/js/views/confirm.js"></script>
+  <script src="/js/views/document.js"></script>
+  <script src="/js/views/products.js"></script>
+  <script src="/js/views/customers.js"></script>
+  <script src="/js/views/documents.js"></script>
+  <script src="/js/views/dashboard.js"></script>
+  <script src="/js/views/settings.js"></script>
+
+  <!-- Main Controller -->
+  <script src="/js/app.js"></script>
+</body>
+</html>
