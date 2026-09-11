@@ -20,8 +20,6 @@ import {
   CheckCircleIcon,
   AlertCircleIcon,
   PackageIcon,
-  UsersIcon,
-  FileTextIcon,
   SearchIcon,
   UserIcon
 } from '@/components/Icons';
@@ -38,7 +36,6 @@ export default function HomePage() {
   const [catalogSearch, setCatalogSearch] = useState('');
   const [cashTendered, setCashTendered] = useState('');
   const [showUpiModal, setShowUpiModal] = useState(false);
-
   const canvasRef = useRef(null);
   const debounceTimerRef = useRef(null);
 
@@ -464,7 +461,7 @@ export default function HomePage() {
   });
 
   return (
-    <div className="view-container" style={{ padding: '16px 20px' }}>
+    <div className="pos-workstation-layout">
       {/* Toast Alert */}
       {toastMessage && (
         <div style={{
@@ -488,233 +485,185 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Workstation 2-Column Responsive Layout */}
-      <div className="live-studio-layout">
+      {/* ================= LEFT COLUMN: COMPACT VOICE & QUICK CATALOG ================= */}
+      <div className="pos-left-deck">
 
-        {/* ================= LEFT COLUMN: VOICE COMMAND & QUICK CATALOG ================= */}
-        <div className="voice-studio-panel">
+        {/* Compact Voice Action Strip */}
+        <div className="voice-compact-bar">
+          <button
+            type="button"
+            className={`voice-mic-btn ${isRecording ? 'recording' : ''}`}
+            onClick={toggleRecording}
+            title={isRecording ? 'Stop Voice Recording' : 'Start Voice Input [Shortcut: F2]'}
+          >
+            {isRecording ? <MicOffIcon size={18} /> : <MicIcon size={18} />}
+          </button>
 
-          {/* Voice Input Deck Card */}
-          <div className="console-card" style={{ padding: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--slate-900)' }}>
-                  Telugu Voice Command Terminal
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--slate-500)' }}>
-                  (మాట్లాడితే బిల్ రెడీ)
-                </div>
-              </div>
-              <div className={`audio-state-pill ${isRecording ? 'listening' : 'idle'}`}>
-                {isRecording && <span className="live-indicator-dot"></span>}
-                <span>{isRecording ? '● Listening...' : 'Ready'}</span>
-              </div>
+          <div className="voice-stream-container">
+            <div className="voice-stream-label">
+              <span>{isRecording ? '● Active Microphone' : 'Telugu Voice [F2]'}</span>
+              {isAnalyzing && <span style={{ color: 'var(--primary-dark)' }}>• Parsing intent...</span>}
             </div>
-
-            {/* Microphone Toggle Deck */}
-            <div className="mic-control-deck" style={{ padding: '10px 14px' }}>
-              <button
-                type="button"
-                id="main-mic-btn"
-                className={`mic-toggle-btn ${isRecording ? 'recording' : ''}`}
-                onClick={toggleRecording}
-                title={isRecording ? 'Pause Voice Recording' : 'Start Voice Input [F2]'}
-                style={{ width: '46px', height: '46px' }}
-              >
-                {isRecording ? <MicOffIcon size={20} /> : <MicIcon size={20} />}
-              </button>
-              <div className="mic-status-copy">
-                <div className="mic-primary-text" style={{ fontSize: '13px' }}>
-                  {isRecording ? 'Listening continuously (హ్యాండ్స్-ఫ్రీ మోడ్)' : 'Click to Speak (లేదా కీబోర్డులో F2 నొక్కండి)'}
-                </div>
-                <div className="mic-secondary-text" style={{ fontSize: '11px' }}>
-                  Speak items naturally in Telugu. Quantities and prices parse live into the active register.
-                </div>
-              </div>
-            </div>
-
-            {/* Visualizer Canvas */}
-            <div className="audio-visualizer-box" style={{ display: isRecording ? 'flex' : 'none', marginTop: '8px', padding: '6px 10px' }}>
-              <canvas ref={canvasRef} className="waveform-canvas" width="360" height="28"></canvas>
-            </div>
-
-            {/* Transcript Stream Pill */}
-            <div style={{ marginTop: '10px', background: 'var(--slate-50)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '8px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '10px', fontWeight: 800, color: 'var(--slate-400)', textTransform: 'uppercase' }}>Live Stream:</span>
-              <span style={{ color: 'var(--slate-800)', fontStyle: 'italic', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {transcript}
-              </span>
-              {isAnalyzing && <span style={{ fontSize: '10px', color: 'var(--primary-dark)', fontWeight: 700 }}>● Processing...</span>}
-            </div>
-
-            {/* Quick Test Voice Chips */}
-            <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginTop: '10px', paddingBottom: '2px' }}>
-              <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--slate-400)', alignSelf: 'center', whiteSpace: 'nowrap' }}>Test:</span>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                style={{ fontSize: '11px', padding: '3px 8px', whiteSpace: 'nowrap' }}
-                onClick={() => simulateSpokenText('రమేష్కి పది బస్తాల సిమెంట్, రెండు పెయింట్ బకెట్లు')}
-              >
-                10 బస్తాల సిమెంట్, 2 పెయింట్
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                style={{ fontSize: '11px', padding: '3px 8px', whiteSpace: 'nowrap' }}
-                onClick={() => simulateSpokenText('వంద గ్రాములు లవంగాలు, వంద గ్రాములు గసగసాలు, ఒక ప్యాకెట్ బాస్మతి బియ్యం')}
-              >
-                100g లవంగాలు, 1 pkt బాస్మతి
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                style={{ fontSize: '11px', padding: '3px 8px', whiteSpace: 'nowrap' }}
-                onClick={() => simulateSpokenText('ఐదు కిలోల బియ్యం, రెండు కిలోల కందిపప్పు')}
-              >
-                5 kg rice, 2 kg కందిపప్పు
-              </button>
+            <div className="voice-stream-text" title={transcript}>
+              {transcript}
             </div>
           </div>
 
-          {/* Quick-Add Product Catalogue Section */}
-          <div className="quick-catalog-section">
-            <div className="quick-catalog-header">
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--slate-900)' }}>
-                  Quick-Add Catalogue
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--slate-500)' }}>
-                  Click item to add directly to the active bill
-                </div>
-              </div>
-
-              {/* Instant Filter Search */}
-              <div style={{ position: 'relative', width: '200px' }}>
-                <input
-                  type="text"
-                  className="form-input"
-                  style={{ padding: '5px 8px 5px 28px', fontSize: '12px', height: '30px' }}
-                  placeholder="Search catalog..."
-                  value={catalogSearch}
-                  onChange={(e) => setCatalogSearch(e.target.value)}
-                />
-                <SearchIcon size={14} style={{ position: 'absolute', left: '8px', top: '8px', color: 'var(--slate-400)' }} />
-              </div>
-            </div>
-
-            {/* Category Tabs */}
-            <div className="category-pill-strip">
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  type="button"
-                  className={`cat-tab ${selectedCategory === cat ? 'active' : ''}`}
-                  style={{ padding: '3px 10px', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                  onClick={() => setSelectedCategory(cat)}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            {/* Product Quick-Add Grid */}
-            <div className="quick-catalog-grid">
-              {filteredCatalog.length === 0 ? (
-                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '24px', color: 'var(--slate-400)', fontSize: '12px' }}>
-                  No items match this search.
-                </div>
-              ) : (
-                filteredCatalog.map(p => {
-                  const stock = p.current_stock !== undefined ? p.current_stock : 0;
-                  const reorder = p.reorder_level || 5;
-                  return (
-                    <div
-                      key={p.id}
-                      className="product-quick-card"
-                      onClick={() => addProductToBill(p)}
-                      title={`Add 1 ${p.unit} of ${p.name} to bill`}
-                    >
-                      <div>
-                        <div className="product-card-title">{p.name}</div>
-                        {p.name_te && <div className="product-card-te">{p.name_te}</div>}
-                      </div>
-                      <div className="product-card-footer">
-                        <div className="product-card-price">
-                          ₹{p.selling_price}
-                          <span className="product-card-unit">/{p.unit}</span>
-                        </div>
-                        {stock <= 0 ? (
-                          <span className="stock-pill out" style={{ fontSize: '9px', padding: '1px 4px' }}>0 {p.unit}</span>
-                        ) : stock <= reorder ? (
-                          <span className="stock-pill low" style={{ fontSize: '9px', padding: '1px 4px' }}>{stock} {p.unit}</span>
-                        ) : (
-                          <span className="stock-pill in-stock" style={{ fontSize: '9px', padding: '1px 4px' }}>{stock}</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+          <div className="voice-sim-strip">
+            <button
+              type="button"
+              className="voice-sim-chip"
+              onClick={() => simulateSpokenText('రమేష్కి పది బస్తాల సిమెంట్, రెండు పెయింట్ బకెట్లు')}
+              title="Quick test prompt"
+            >
+              10 Cement, 2 Paint
+            </button>
+            <button
+              type="button"
+              className="voice-sim-chip"
+              onClick={() => simulateSpokenText('ఐదు కిలోల బియ్యం, రెండు కిలోల కందిపప్పు')}
+              title="Quick test prompt"
+            >
+              5kg Rice, 2kg Dal
+            </button>
           </div>
-
         </div>
 
-        {/* ================= RIGHT COLUMN: REGISTER BILL & TENDER TERMINAL ================= */}
-        <div className="pos-register-panel">
-          
-          {/* Register Top Bar */}
-          <div className="register-top-bar">
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '16px', fontWeight: 900, color: 'var(--slate-900)', fontVariantNumeric: 'tabular-nums' }}>
-                  {activeInvoice.invoice_number}
-                </span>
-                <span className="invoice-badge-status saved">
-                  ● Saved
-                </span>
-                <div style={{ display: 'inline-flex', gap: '2px', marginLeft: '6px' }}>
-                  <button
-                    type="button"
-                    className={`cat-tab ${!isQuotation ? 'active' : ''}`}
-                    style={{ padding: '2px 8px', fontSize: '10px' }}
-                    onClick={() => {
-                      setActiveInvoice(prev => {
-                        const next = { ...prev, document_type: 'invoice' };
-                        autoSave(next);
-                        return next;
-                      });
-                    }}
-                  >
-                    Tax Invoice
-                  </button>
-                  <button
-                    type="button"
-                    className={`cat-tab ${isQuotation ? 'active' : ''}`}
-                    style={{ padding: '2px 8px', fontSize: '10px' }}
-                    onClick={() => {
-                      setActiveInvoice(prev => {
-                        const next = { ...prev, document_type: 'quotation' };
-                        autoSave(next);
-                        return next;
-                      });
-                    }}
-                  >
-                    Quotation
-                  </button>
-                </div>
+        {/* Quick-Add Product Catalogue Section */}
+        <div className="quick-catalog-section">
+          <div className="quick-catalog-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--slate-900)' }}>
+                Catalogue Products
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--slate-500)', marginTop: '3px' }}>
-                {isQuotation ? 'Price Quotation' : 'GST Tax Invoice'} • Date: {activeInvoice.date}
+              <div style={{ fontSize: '10px', color: 'var(--slate-500)' }}>
+                ({filteredCatalog.length} items)
               </div>
             </div>
 
-            {/* Customer Selector Dropdown */}
-            <div style={{ minWidth: '190px' }}>
+            {/* Instant Filter Search */}
+            <div style={{ position: 'relative', width: '180px' }}>
+              <input
+                type="text"
+                className="form-input"
+                style={{ padding: '4px 8px 4px 26px', fontSize: '11px', height: '28px' }}
+                placeholder="Search catalogue..."
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
+              />
+              <SearchIcon size={13} style={{ position: 'absolute', left: '7px', top: '7px', color: 'var(--slate-400)' }} />
+            </div>
+          </div>
+
+          {/* Category Tabs */}
+          <div className="category-pill-strip">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                type="button"
+                className={`cat-tab ${selectedCategory === cat ? 'active' : ''}`}
+                style={{ padding: '2px 8px', fontSize: '10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                onClick={() => setSelectedCategory(cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Product Quick-Add Grid */}
+          <div className="quick-catalog-grid">
+            {filteredCatalog.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '20px', color: 'var(--slate-400)', fontSize: '11px' }}>
+                No products match this category/search.
+              </div>
+            ) : (
+              filteredCatalog.map(p => {
+                const stock = p.current_stock !== undefined ? p.current_stock : 0;
+                const reorder = p.reorder_level || 5;
+                return (
+                  <div
+                    key={p.id}
+                    className="product-quick-card"
+                    onClick={() => addProductToBill(p)}
+                    title={`Click to add 1 ${p.unit} of ${p.name} to bill`}
+                  >
+                    <div>
+                      <div className="product-card-title">{p.name}</div>
+                      {p.name_te && <div className="product-card-te">{p.name_te}</div>}
+                    </div>
+                    <div className="product-card-footer">
+                      <div className="product-card-price">
+                        ₹{p.selling_price}
+                        <span className="product-card-unit">/{p.unit}</span>
+                      </div>
+                      {stock <= 0 ? (
+                        <span className="stock-pill out" style={{ fontSize: '9px', padding: '1px 3px' }}>0 {p.unit}</span>
+                      ) : stock <= reorder ? (
+                        <span className="stock-pill low" style={{ fontSize: '9px', padding: '1px 3px' }}>{stock} {p.unit}</span>
+                      ) : (
+                        <span className="stock-pill in-stock" style={{ fontSize: '9px', padding: '1px 3px' }}>{stock}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* ================= RIGHT COLUMN: REGISTER BILL & TENDER TERMINAL ================= */}
+      <div className="pos-right-deck">
+        
+        {/* Ticket Header (Clean 2 Rows) */}
+        <div className="register-top-bar">
+          <div className="ticket-header-row-1">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '15px', fontWeight: 900, color: 'var(--slate-900)', fontVariantNumeric: 'tabular-nums' }}>
+                {activeInvoice.invoice_number}
+              </span>
+              <span className="invoice-badge-status saved">
+                ● Saved
+              </span>
+            </div>
+
+            <div className="doc-type-segmented-switch">
+              <button
+                type="button"
+                className={`doc-type-segment-btn ${!isQuotation ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveInvoice(prev => {
+                    const next = { ...prev, document_type: 'invoice' };
+                    autoSave(next);
+                    return next;
+                  });
+                }}
+              >
+                Tax Invoice
+              </button>
+              <button
+                type="button"
+                className={`doc-type-segment-btn ${isQuotation ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveInvoice(prev => {
+                    const next = { ...prev, document_type: 'quotation' };
+                    autoSave(next);
+                    return next;
+                  });
+                }}
+              >
+                Quotation
+              </button>
+            </div>
+          </div>
+
+          <div className="ticket-header-row-2">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, position: 'relative' }}>
+              <UserIcon size={14} style={{ position: 'absolute', left: '8px', top: '7px', color: 'var(--slate-400)' }} />
               <select
                 className="form-input"
-                style={{ padding: '4px 8px', fontSize: '12px', height: '30px' }}
+                style={{ padding: '3px 8px 3px 26px', fontSize: '11px', height: '28px' }}
                 value={activeInvoice.customer_id || ''}
                 onChange={(e) => {
                   const custId = e.target.value;
@@ -757,295 +706,277 @@ export default function HomePage() {
                   </option>
                 ))}
               </select>
-
-              {/* Customer Khata Balance Alert if customer selected */}
-              {(() => {
-                if (!activeInvoice.customer_id) return null;
-                const cust = customersList.find(c => c.id === activeInvoice.customer_id);
-                if (!cust) return null;
-                return (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '3px', fontSize: '10px' }}>
-                    <span style={{ color: cust.current_balance > 0 ? 'var(--accent-red)' : '#16a34a', fontWeight: 700 }}>
-                      {cust.current_balance > 0 ? `బాకీ: ₹${cust.current_balance.toLocaleString('en-IN')}` : '₹0 Due'}
-                    </span>
-                    <Link href={`/customer/${cust.id}`} style={{ color: 'var(--primary-dark)', textDecoration: 'none', fontWeight: 600 }}>
-                      Khata Ledger →
-                    </Link>
-                  </div>
-                );
-              })()}
             </div>
-          </div>
 
-          {/* Line Items List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minHeight: '140px', maxHeight: '310px', overflowY: 'auto', paddingRight: '2px' }}>
-            {items.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px 16px', background: 'var(--slate-50)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-subtle)', color: 'var(--slate-500)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                <PackageIcon size={26} style={{ color: 'var(--slate-400)' }} />
-                <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--slate-700)' }}>
-                  Bill is empty • Ready for items
+            {/* Khata Balance Notice */}
+            {(() => {
+              if (!activeInvoice.customer_id) return null;
+              const cust = customersList.find(c => c.id === activeInvoice.customer_id);
+              if (!cust) return null;
+              return (
+                <div style={{ fontSize: '10px', whiteSpace: 'nowrap' }}>
+                  <span style={{ color: cust.current_balance > 0 ? 'var(--accent-red)' : '#16a34a', fontWeight: 800 }}>
+                    {cust.current_balance > 0 ? `Due: ₹${cust.current_balance}` : '₹0 Due'}
+                  </span>
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--slate-400)' }}>
-                  Speak in Telugu or click any product tile on the left
-                </div>
-                <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: '4px', fontSize: '11px', padding: '3px 8px' }} onClick={promptAddItem}>
-                  <PlusIcon size={12} /> Custom Line Item
-                </button>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* Scrollable Line Items List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minHeight: '60px', overflowY: 'auto', paddingRight: '2px', margin: '4px 0' }}>
+          {items.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '16px 10px', background: 'var(--slate-50)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-subtle)', color: 'var(--slate-500)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', height: '100%' }}>
+              <PackageIcon size={20} style={{ color: 'var(--slate-400)' }} />
+              <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--slate-700)' }}>
+                Bill is empty • Ready for items
               </div>
-            ) : (
-              items.map((item, idx) => (
-                <div key={item.id || idx} className="pos-item-card" style={{ padding: '8px 10px', margin: 0 }}>
-                  <div className="item-top-row">
-                    <div style={{ flex: 1 }}>
-                      <input
-                        type="text"
-                        value={item.name || ''}
-                        placeholder="Item Description"
-                        className="item-name-input"
-                        style={{ fontSize: '13px', padding: '1px 2px' }}
-                        onChange={(e) => updateItemName(idx, e.target.value)}
-                      />
-                      <div className="item-sub-meta" style={{ fontSize: '10px' }}>
-                        <span>Unit: <strong>{item.unit || 'pcs'}</strong></span>
-                        {item.gst_percent ? <span>• GST: {item.gst_percent}%</span> : null}
-                      </div>
-                    </div>
-
-                    <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--slate-900)', fontVariantNumeric: 'tabular-nums' }}>
-                        {documentGenerator.formatCurrency(item.line_total)}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="item-bottom-controls" style={{ padding: '4px 0 0 0', marginTop: '4px' }}>
-                    <div className="qty-stepper-control">
-                      <button type="button" className="stepper-btn" style={{ width: '24px', height: '24px' }} onClick={() => updateItemQty(idx, -1)}>-</button>
-                      <span className="stepper-value-display" style={{ fontSize: '12px', minWidth: '40px', padding: '0 6px' }}>{item.quantity} {item.unit || ''}</span>
-                      <button type="button" className="stepper-btn" style={{ width: '24px', height: '24px' }} onClick={() => updateItemQty(idx, 1)}>+</button>
-                    </div>
-
-                    <div className="rate-input-box" style={{ fontSize: '11px' }}>
-                      <span>₹</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={item.unit_price || 0}
-                        className="rate-input"
-                        style={{ width: '70px', padding: '2px 4px', fontSize: '12px' }}
-                        onChange={(e) => updateItemPrice(idx, e.target.value)}
-                      />
-                      <span style={{ fontSize: '10px', color: 'var(--slate-400)' }}>/{item.unit || 'pcs'}</span>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm"
-                      style={{ padding: '2px 6px', fontSize: '10px', color: 'var(--accent-red)', borderColor: '#fca5a5' }}
-                      onClick={() => removeItem(idx)}
-                      title="Remove item"
-                    >
-                      <TrashIcon size={12} />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {items.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
-              <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={promptAddItem}>
-                <PlusIcon size={12} /> Add Custom Item
+              <div style={{ fontSize: '10px', color: 'var(--slate-400)' }}>
+                Speak in Telugu [F2] or click products on the left
+              </div>
+              <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: '2px', fontSize: '10px', padding: '2px 6px' }} onClick={promptAddItem}>
+                <PlusIcon size={11} /> Custom Item
               </button>
             </div>
+          ) : (
+            items.map((item, idx) => (
+              <div key={item.id || idx} className="pos-item-card">
+                <div className="item-top-row">
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="text"
+                      value={item.name || ''}
+                      placeholder="Item Description"
+                      className="item-name-input"
+                      style={{ fontSize: '12px', padding: '1px 2px' }}
+                      onChange={(e) => updateItemName(idx, e.target.value)}
+                    />
+                    <div className="item-sub-meta" style={{ fontSize: '9px' }}>
+                      <span>Unit: <strong>{item.unit || 'pcs'}</strong></span>
+                      {item.gst_percent ? <span>• GST: {item.gst_percent}%</span> : null}
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--slate-900)', fontVariantNumeric: 'tabular-nums' }}>
+                      {documentGenerator.formatCurrency(item.line_total)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="item-bottom-controls" style={{ padding: '2px 0 0 0', marginTop: '2px' }}>
+                  <div className="qty-stepper-control">
+                    <button type="button" className="stepper-btn" style={{ width: '22px', height: '22px', fontSize: '12px' }} onClick={() => updateItemQty(idx, -1)}>-</button>
+                    <span className="stepper-value-display" style={{ fontSize: '11px', minWidth: '36px', padding: '0 4px' }}>{item.quantity} {item.unit || ''}</span>
+                    <button type="button" className="stepper-btn" style={{ width: '22px', height: '22px', fontSize: '12px' }} onClick={() => updateItemQty(idx, 1)}>+</button>
+                  </div>
+
+                  <div className="rate-input-box" style={{ fontSize: '10px' }}>
+                    <span>₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={item.unit_price || 0}
+                      className="rate-input"
+                      style={{ width: '60px', padding: '2px 3px', fontSize: '11px' }}
+                      onChange={(e) => updateItemPrice(idx, e.target.value)}
+                    />
+                    <span style={{ fontSize: '9px', color: 'var(--slate-400)' }}>/{item.unit || 'pcs'}</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    style={{ padding: '1px 5px', fontSize: '10px', color: 'var(--accent-red)', borderColor: '#fca5a5' }}
+                    onClick={() => removeItem(idx)}
+                    title="Remove item"
+                  >
+                    <TrashIcon size={11} />
+                  </button>
+                </div>
+              </div>
+            ))
           )}
+        </div>
 
-          {/* Permanently Anchored Totals Summary Ledger */}
-          <div className="totals-ledger-box" style={{ padding: '10px 14px', marginTop: '10px' }}>
-            <div className="totals-line-row">
-              <span style={{ fontSize: '12px' }}>Subtotal / సబ్ టోటల్:</span>
-              <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{documentGenerator.formatCurrency(activeInvoice.subtotal)}</span>
-            </div>
+        {/* Compact Permanently Anchored Totals Ledger */}
+        <div className="totals-ledger-box">
+          <div className="totals-line-row" style={{ padding: '1px 0' }}>
+            <span style={{ fontSize: '11px' }}>Subtotal:</span>
+            <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', fontSize: '11px' }}>
+              {documentGenerator.formatCurrency(activeInvoice.subtotal)}
+            </span>
+          </div>
 
-            <div className="totals-line-row">
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
-                Discount:
+          <div className="totals-line-row" style={{ padding: '1px 0' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px' }}>
+              Discount:
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={activeInvoice.discount_percent || 0}
+                style={{ width: '34px', padding: '1px 2px', fontSize: '10px', border: '1px solid var(--border-subtle)', borderRadius: '2px' }}
+                onChange={(e) => {
+                  const val = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                  setActiveInvoice(prev => {
+                    const next = calculateInvoiceTotals({ ...prev, discount_percent: val });
+                    autoSave(next);
+                    return next;
+                  });
+                }}
+              /> %
+            </span>
+            <span style={{ color: activeInvoice.discount_amount > 0 ? 'var(--accent-red)' : 'inherit', fontVariantNumeric: 'tabular-nums', fontSize: '11px' }}>
+              -{documentGenerator.formatCurrency(activeInvoice.discount_amount || 0)}
+            </span>
+          </div>
+
+          <div className="totals-line-row" style={{ padding: '1px 0' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
+              GST:
+              <label style={{ fontSize: '10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                 <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={activeInvoice.discount_percent || 0}
-                  style={{ width: '40px', padding: '1px 3px', fontSize: '11px', border: '1px solid var(--border-subtle)', borderRadius: '3px' }}
+                  type="checkbox"
+                  checked={activeInvoice.include_gst !== false}
                   onChange={(e) => {
-                    const val = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                    const checked = e.target.checked;
                     setActiveInvoice(prev => {
-                      const next = calculateInvoiceTotals({ ...prev, discount_percent: val });
+                      const next = calculateInvoiceTotals({ ...prev, include_gst: checked });
                       autoSave(next);
                       return next;
                     });
                   }}
-                /> %
-              </span>
-              <span style={{ color: activeInvoice.discount_amount > 0 ? 'var(--accent-red)' : 'inherit', fontVariantNumeric: 'tabular-nums' }}>
-                -{documentGenerator.formatCurrency(activeInvoice.discount_amount || 0)}
-              </span>
-            </div>
-
-            <div className="totals-line-row">
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
-                GST (CGST + SGST):
-                <label style={{ fontSize: '11px', cursor: 'pointer', marginLeft: '4px' }}>
-                  <input
-                    type="checkbox"
-                    checked={activeInvoice.include_gst !== false}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setActiveInvoice(prev => {
-                        const next = calculateInvoiceTotals({ ...prev, include_gst: checked });
-                        autoSave(next);
-                        return next;
-                      });
-                    }}
-                  /> Apply
-                </label>
-              </span>
-              <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{documentGenerator.formatCurrency(activeInvoice.gst_amount || 0)}</span>
-            </div>
-
-            <div className="totals-line-row grand-total-row" style={{ marginTop: '6px', paddingTop: '6px' }}>
-              <span style={{ fontSize: '15px' }}>Grand Total / మొత్తం:</span>
-              <span className="grand-total-val" style={{ fontSize: '20px', fontVariantNumeric: 'tabular-nums' }}>
-                {documentGenerator.formatCurrency(activeInvoice.total)}
-              </span>
-            </div>
+                /> Apply
+              </label>
+            </span>
+            <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', fontSize: '11px' }}>
+              {documentGenerator.formatCurrency(activeInvoice.gst_amount || 0)}
+            </span>
           </div>
 
-          {/* Payment Tender Console */}
-          <div style={{ marginTop: '10px' }}>
-            <div className="payment-selector-strip" style={{ marginTop: 0 }}>
-              <button
-                type="button"
-                className={`payment-chip ${activeInvoice.payment_mode === 'cash' ? 'selected' : ''}`}
-                style={{ padding: '6px 8px', fontSize: '11px' }}
-                onClick={() => {
-                  setActiveInvoice(prev => {
-                    const next = { ...prev, payment_mode: 'cash', payment_status: 'paid' };
-                    autoSave(next);
-                    return next;
-                  });
-                }}
-              >
-                <CashIcon size={15} />
-                <span>Cash (నగదు)</span>
-              </button>
+          <div className="totals-line-row grand-total-row" style={{ marginTop: '3px', paddingTop: '4px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 800 }}>Grand Total:</span>
+            <span className="grand-total-val" style={{ fontSize: '17px', fontVariantNumeric: 'tabular-nums' }}>
+              {documentGenerator.formatCurrency(activeInvoice.total)}
+            </span>
+          </div>
+        </div>
 
-              <button
-                type="button"
-                className={`payment-chip ${activeInvoice.payment_mode === 'upi' ? 'selected' : ''}`}
-                style={{ padding: '6px 8px', fontSize: '11px' }}
-                onClick={() => {
-                  setActiveInvoice(prev => {
-                    const next = { ...prev, payment_mode: 'upi', payment_status: 'paid' };
-                    autoSave(next);
-                    return next;
-                  });
-                  if (activeInvoice.total > 0) {
-                    setShowUpiModal(true);
-                  }
-                }}
-              >
-                <QrCodeIcon size={15} />
-                <span>UPI / QR</span>
-              </button>
+        {/* Compact Payment Tender Strip */}
+        <div style={{ flexShrink: 0, marginTop: '4px' }}>
+          <div className="payment-selector-strip" style={{ marginTop: 0 }}>
+            <button
+              type="button"
+              className={`payment-chip ${activeInvoice.payment_mode === 'cash' ? 'selected' : ''}`}
+              style={{ padding: '4px', fontSize: '10px' }}
+              onClick={() => {
+                setActiveInvoice(prev => {
+                  const next = { ...prev, payment_mode: 'cash', payment_status: 'paid' };
+                  autoSave(next);
+                  return next;
+                });
+              }}
+            >
+              <CashIcon size={14} />
+              <span>Cash</span>
+            </button>
 
-              <button
-                type="button"
-                className={`payment-chip credit ${activeInvoice.payment_mode === 'credit' ? 'selected credit' : ''}`}
-                style={{ padding: '6px 8px', fontSize: '11px' }}
-                onClick={() => {
-                  if (!activeInvoice.customer_id) {
-                    showToast('బాకీ కోసం కస్టమర్‌ను సెలెక్ట్ చేయండి.');
-                  }
-                  setActiveInvoice(prev => {
-                    const next = { ...prev, payment_mode: 'credit', payment_status: 'credit' };
-                    autoSave(next);
-                    return next;
-                  });
-                }}
-              >
-                <CreditCardIcon size={15} />
-                <span>Udhaar (బాకీ)</span>
-              </button>
+            <button
+              type="button"
+              className={`payment-chip ${activeInvoice.payment_mode === 'upi' ? 'selected' : ''}`}
+              style={{ padding: '4px', fontSize: '10px' }}
+              onClick={() => {
+                setActiveInvoice(prev => {
+                  const next = { ...prev, payment_mode: 'upi', payment_status: 'paid' };
+                  autoSave(next);
+                  return next;
+                });
+                if (activeInvoice.total > 0) {
+                  setShowUpiModal(true);
+                }
+              }}
+            >
+              <QrCodeIcon size={14} />
+              <span>UPI / QR</span>
+            </button>
 
-              <button
-                type="button"
-                className={`payment-chip ${activeInvoice.payment_mode === 'partial' ? 'selected' : ''}`}
-                style={{ padding: '6px 8px', fontSize: '11px' }}
-                onClick={() => {
-                  setActiveInvoice(prev => {
-                    const next = { ...prev, payment_mode: 'partial', payment_status: 'partial' };
-                    autoSave(next);
-                    return next;
-                  });
-                }}
-              >
-                <RefreshCwIcon size={15} />
-                <span>Split / ఇతర</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              className={`payment-chip credit ${activeInvoice.payment_mode === 'credit' ? 'selected credit' : ''}`}
+              style={{ padding: '4px', fontSize: '10px' }}
+              onClick={() => {
+                if (!activeInvoice.customer_id) {
+                  showToast('బాకీ కోసం కస్టమర్‌ను సెలెక్ట్ చేయండి.');
+                }
+                setActiveInvoice(prev => {
+                  const next = { ...prev, payment_mode: 'credit', payment_status: 'credit' };
+                  autoSave(next);
+                  return next;
+                });
+              }}
+            >
+              <CreditCardIcon size={14} />
+              <span>Udhaar (బాకీ)</span>
+            </button>
 
-            {/* Cash Tender & Change Return Calculator */}
-            {activeInvoice.payment_mode === 'cash' && activeInvoice.total > 0 && (
-              <div className="tender-console" style={{ padding: '8px 10px', marginTop: '8px' }}>
-                <div className="tender-calc-row">
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--slate-700)' }}>
-                    Cash Tendered:
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ fontWeight: 700, fontSize: '12px' }}>₹</span>
-                    <input
-                      type="number"
-                      className="form-input"
-                      style={{ width: '90px', padding: '3px 6px', fontWeight: 800, textAlign: 'right', fontSize: '12px' }}
-                      value={cashTendered}
-                      onChange={(e) => setCashTendered(e.target.value)}
-                      placeholder={String(Math.ceil(activeInvoice.total))}
-                    />
-                  </div>
-                </div>
-                <div className="tender-quick-buttons" style={{ marginTop: '4px' }}>
-                  <button type="button" className="tender-chip-button" style={{ padding: '2px 6px', fontSize: '10px' }} onClick={() => setCashTendered(String(Math.ceil(activeInvoice.total)))}>Exact</button>
-                  <button type="button" className="tender-chip-button" style={{ padding: '2px 6px', fontSize: '10px' }} onClick={() => setCashTendered(String(Math.ceil(activeInvoice.total) + 100))}>+₹100</button>
-                  <button type="button" className="tender-chip-button" style={{ padding: '2px 6px', fontSize: '10px' }} onClick={() => setCashTendered(String(Math.ceil(activeInvoice.total) + 500))}>+₹500</button>
-                  <button type="button" className="tender-chip-button" style={{ padding: '2px 6px', fontSize: '10px' }} onClick={() => setCashTendered('2000')}>₹2000 Note</button>
-                </div>
-                {parseFloat(cashTendered) >= activeInvoice.total && (
-                  <div className="change-due-box" style={{ padding: '4px 8px', marginTop: '4px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#065f46' }}>
-                      Return Change / చిల్లర:
-                    </span>
-                    <span style={{ fontSize: '14px', fontWeight: 900, color: '#065f46', fontVariantNumeric: 'tabular-nums' }}>
-                      ₹{(parseFloat(cashTendered) - activeInvoice.total).toFixed(2)}
-                    </span>
-                  </div>
-                )}
+            <button
+              type="button"
+              className={`payment-chip ${activeInvoice.payment_mode === 'partial' ? 'selected' : ''}`}
+              style={{ padding: '4px', fontSize: '10px' }}
+              onClick={() => {
+                setActiveInvoice(prev => {
+                  const next = { ...prev, payment_mode: 'partial', payment_status: 'partial' };
+                  autoSave(next);
+                  return next;
+                });
+              }}
+            >
+              <RefreshCwIcon size={14} />
+              <span>Split</span>
+            </button>
+          </div>
+
+          {/* Quick Cash Tender Row */}
+          {activeInvoice.payment_mode === 'cash' && activeInvoice.total > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--slate-50)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)', marginTop: '4px', fontSize: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <span style={{ fontWeight: 700 }}>Tender: ₹</span>
+                <input
+                  type="number"
+                  style={{ width: '60px', padding: '1px 3px', fontWeight: 800, textAlign: 'right', fontSize: '10px', border: '1px solid var(--border-subtle)', borderRadius: '3px' }}
+                  value={cashTendered}
+                  onChange={(e) => setCashTendered(e.target.value)}
+                  placeholder={String(Math.ceil(activeInvoice.total))}
+                />
+                <button type="button" className="tender-chip-button" style={{ padding: '1px 4px', fontSize: '9px' }} onClick={() => setCashTendered(String(Math.ceil(activeInvoice.total)))}>Exact</button>
+                <button type="button" className="tender-chip-button" style={{ padding: '1px 4px', fontSize: '9px' }} onClick={() => setCashTendered(String(Math.ceil(activeInvoice.total) + 100))}>+100</button>
+                <button type="button" className="tender-chip-button" style={{ padding: '1px 4px', fontSize: '9px' }} onClick={() => setCashTendered(String(Math.ceil(activeInvoice.total) + 500))}>+500</button>
               </div>
-            )}
-          </div>
 
-          {/* Action Buttons Toolbar */}
-          <div className="action-grid-buttons" style={{ marginTop: '10px' }}>
+              {parseFloat(cashTendered) >= activeInvoice.total && (
+                <div style={{ fontWeight: 800, color: '#065f46' }}>
+                  Change: ₹{(parseFloat(cashTendered) - activeInvoice.total).toFixed(2)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 2-Row Action Buttons Toolbar */}
+        <div className="action-grid-buttons">
+          <div className="action-row-primary">
             <button
               type="button"
               className="btn btn-primary"
               onClick={printLiveBill}
               title="Print Standard A4 Invoice [Shortcut: F4]"
-              style={{ fontWeight: 800 }}
+              style={{ fontWeight: 800, flex: 1, padding: '7px 10px', fontSize: '12px' }}
               disabled={items.length === 0}
             >
-              <PrinterIcon size={15} /> Complete & Print [F4]
+              <PrinterIcon size={14} /> Complete & Print [F4]
             </button>
             <button
               type="button"
@@ -1056,40 +987,51 @@ export default function HomePage() {
                 documentGenerator.printThermal(activeInvoice);
               }}
               title="Print Thermal Receipt Slip"
+              style={{ padding: '7px 10px', fontSize: '11px', whiteSpace: 'nowrap' }}
               disabled={items.length === 0}
             >
               Thermal Slip
             </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => setShowUpiModal(true)}
-              style={{ color: 'var(--primary-dark)', borderColor: 'var(--primary-border)', background: 'var(--primary-light)' }}
-              title="Display UPI QR Code on Counter Screen"
-              disabled={activeInvoice.total === 0}
-            >
-              <QrCodeIcon size={15} /> UPI QR
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={shareLiveBill}
-              disabled={items.length === 0}
-              style={{ background: '#16a34a', borderColor: '#16a34a', color: '#ffffff' }}
-            >
-              <WhatsAppIcon size={15} /> WhatsApp
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={startNewBill}
-              title="Clear register for next customer [F8]"
-              style={{ color: 'var(--accent-red)', borderColor: '#fecaca' }}
-            >
-              <RefreshCwIcon size={13} /> Reset [F8]
-            </button>
           </div>
 
+          <div className="action-row-secondary">
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => setShowUpiModal(true)}
+              style={{ color: 'var(--primary-dark)', borderColor: 'var(--primary-border)', background: 'var(--primary-light)', padding: '3px 4px', fontSize: '10px' }}
+              title="Display UPI QR Code"
+              disabled={activeInvoice.total === 0}
+            >
+              <QrCodeIcon size={13} /> UPI QR
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={shareLiveBill}
+              disabled={items.length === 0}
+              style={{ background: '#16a34a', borderColor: '#16a34a', color: '#ffffff', padding: '3px 4px', fontSize: '10px' }}
+            >
+              <WhatsAppIcon size={13} /> WhatsApp
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              style={{ padding: '3px 4px', fontSize: '10px' }}
+              onClick={promptAddItem}
+            >
+              <PlusIcon size={11} /> + Custom
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={startNewBill}
+              title="Clear register for next customer [F8]"
+              style={{ color: 'var(--accent-red)', borderColor: '#fecaca', padding: '3px 4px', fontSize: '10px' }}
+            >
+              <RefreshCwIcon size={11} /> Reset [F8]
+            </button>
+          </div>
         </div>
 
       </div>
@@ -1097,42 +1039,42 @@ export default function HomePage() {
       {/* Dynamic Bharat UPI QR Counter Modal */}
       {showUpiModal && activeInvoice && (
         <div className="modal-backdrop-overlay" onClick={() => setShowUpiModal(false)}>
-          <div className="modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ padding: '24px', textAlign: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--slate-900)' }}>
+          <div className="modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ padding: '20px', textAlign: 'center', maxWidth: '360px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--slate-900)' }}>
                 Scan to Pay via UPI
               </div>
               <button
                 type="button"
                 onClick={() => setShowUpiModal(false)}
-                style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: 'var(--slate-400)' }}
+                style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: 'var(--slate-400)' }}
               >
                 ✕
               </button>
             </div>
 
-            <div style={{ background: '#ffffff', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', display: 'inline-block', margin: '0 auto 12px', boxShadow: 'var(--shadow-xs)' }}>
+            <div style={{ background: '#ffffff', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', display: 'inline-block', margin: '0 auto 8px', boxShadow: 'var(--shadow-xs)' }}>
               <img
                 src={documentGenerator.getUpiQrUrl(activeInvoice.total, activeInvoice.invoice_number)}
                 alt="UPI QR Code"
-                style={{ width: '200px', height: '200px', display: 'block', borderRadius: '4px' }}
+                style={{ width: '180px', height: '180px', display: 'block', borderRadius: '4px' }}
               />
             </div>
 
-            <div style={{ fontSize: '12px', color: 'var(--slate-600)', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--slate-600)', marginBottom: '2px' }}>
               Scan with Google Pay, PhonePe, Paytm or Any UPI App
             </div>
-            <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary-dark)', marginBottom: '4px' }}>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--primary-dark)', marginBottom: '2px' }}>
               {documentGenerator.formatCurrency(activeInvoice.total)}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--slate-500)' }}>
+            <div style={{ fontSize: '10px', color: 'var(--slate-500)' }}>
               UPI ID: <strong>{biz.upi_id}</strong> • Bill #{activeInvoice.invoice_number}
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
               <button
                 type="button"
-                className="btn btn-outline"
+                className="btn btn-outline btn-sm"
                 style={{ flex: 1 }}
                 onClick={() => setShowUpiModal(false)}
               >
@@ -1140,7 +1082,7 @@ export default function HomePage() {
               </button>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary btn-sm"
                 style={{ flex: 1 }}
                 onClick={() => {
                   setShowUpiModal(false);
