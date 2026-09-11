@@ -22,7 +22,8 @@ import {
   PackageIcon,
   UsersIcon,
   FileTextIcon,
-  BarChartIcon
+  SearchIcon,
+  UserIcon
 } from '@/components/Icons';
 
 export default function HomePage() {
@@ -32,11 +33,16 @@ export default function HomePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
   const [customersList, setCustomersList] = useState([]);
+  const [productsList, setProductsList] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [catalogSearch, setCatalogSearch] = useState('');
   const [cashTendered, setCashTendered] = useState('');
   const [showUpiModal, setShowUpiModal] = useState(false);
 
   const canvasRef = useRef(null);
   const debounceTimerRef = useRef(null);
+
+  const categories = ['All', 'Cement', 'Paint', 'Hardware', 'Electrical', 'Plumbing', 'Grocery'];
 
   // Initialize fresh active invoice
   const initInvoice = () => {
@@ -71,6 +77,7 @@ export default function HomePage() {
   useEffect(() => {
     initInvoice();
     setCustomersList(store.getCustomers());
+    setProductsList(store.getProducts());
   }, []);
 
   // Desktop Keyboard Shortcuts: F2 = Mic, F4 = Print, F8 = New Bill
@@ -125,179 +132,191 @@ export default function HomePage() {
       discount_amount: discountAmount,
       taxable_amount: subtotal - discountAmount,
       gst_amount: gstAmount,
-      total: grandTotal
+      total: grandTotal,
+      amount_paid: inv.payment_status === 'paid' ? grandTotal : inv.amount_paid || 0
     };
   };
 
-  // Merge locally or remote extracted items
-  const mergeExtractedItems = (extracted) => {
-    if (!extracted || !extracted.items) return;
+  const autoSave = (inv) => {
+    if (!inv || !inv.id) return;
+    if (inv.document_type === 'quotation') {
+      store.saveQuotation(inv);
+    } else {
+      store.saveInvoice(inv);
+    }
+  };
+
+  // 1-Click Quick Add Product to Active Bill
+  const addProductToBill = (product) => {
+    setActiveInvoice(prev => {
+      if (!prev) return prev;
+      const items = [...(prev.items || [])];
+      const existingIdx = items.findIndex(i => i.product_id === product.id);
+
+      if (existingIdx >= 0) {
+        items[existingIdx] = {
+          ...items[existingIdx],
+          quantity: items[existingIdx].quantity + 1
+        };
+      } else {
+        items.push({
+          id: 'item-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          product_id: product.id,
+          name: product.name,
+          name_te: product.name_te || '',
+          quantity: 1,
+          unit: product.unit || 'pcs',
+          unit_price: product.selling_price || 0,
+          gst_percent: product.gst_percent !== undefined ? product.gst_percent : 18
+        });
+      }
+
+      const calculated = calculateInvoiceTotals({ ...prev, items });
+      autoSave(calculated);
+      return calculated;
+    });
+
+    voiceManager.playFeedbackSound('click');
+  };
+
+  // Process live spoken Telugu text into bill items
+  const mergeExtractedItems = (extractedData) => {
+    if (!extractedData || !extractedData.items || extractedData.items.length === 0) return;
 
     setActiveInvoice(prev => {
       if (!prev) return prev;
-      let nextInv = { ...prev };
 
-      if (extracted.customer_name && prev.customer_name === 'Cash Customer / రిటైల్') {
-        nextInv.customer_name = extracted.customer_name;
-      }
-      if (extracted.document_type) {
-        nextInv.document_type = extracted.document_type;
-      }
+      let currentItems = [...(prev.items || [])];
 
-      const currentItems = [...nextInv.items];
+      extractedData.items.forEach(rawItem => {
+        const matchedProduct = matcher.findBestMatch(rawItem.product_name, productsList);
 
-      for (const rawItem of extracted.items) {
-        const spokenName = (rawItem.spoken_name || 'వస్తువు').replace(/[\uFFFD\uFFFE]/g, '').trim();
-        let product = null;
-
-        if (rawItem.matched_product_id) {
-          product = store.getProductById(rawItem.matched_product_id);
-        }
-        if (!product) {
-          const match = matcher.matchProduct(spokenName);
-          if (match && match.product) product = match.product;
-        }
-
-        const qty = parseFloat(rawItem.quantity) || 1;
-        const unit = rawItem.unit || (product ? product.unit : 'pcs');
-        const rate = (product && product.selling_price > 0) ? product.selling_price : (rawItem.unit_price || 50);
-        const gstRate = (product && nextInv.include_gst) ? (product.gst_percent || 0) : 0;
-        const taxable = qty * rate;
-        const gstAmt = (taxable * gstRate) / 100;
+        const productName = matchedProduct ? matchedProduct.name : (rawItem.product_name || 'వస్తువు');
+        const unitPrice = matchedProduct
+          ? matchedProduct.selling_price
+          : (rawItem.unit_price || 100);
+        const unit = rawItem.unit || (matchedProduct ? matchedProduct.unit : 'pcs');
+        const gst = matchedProduct ? matchedProduct.gst_percent : 18;
+        const qty = rawItem.quantity || 1;
 
         const existingIdx = currentItems.findIndex(i =>
-          (product && i.product_id === product.id) ||
-          i.name.toLowerCase() === spokenName.toLowerCase()
+          i.name.toLowerCase() === productName.toLowerCase() ||
+          (matchedProduct && i.product_id === matchedProduct.id)
         );
 
         if (existingIdx >= 0) {
           currentItems[existingIdx] = {
             ...currentItems[existingIdx],
-            quantity: qty,
-            unit: unit,
-            unit_price: rate,
-            taxable_value: qty * rate,
-            gst_amount: gstAmt,
-            line_total: taxable + gstAmt
+            quantity: currentItems[existingIdx].quantity + qty
           };
         } else {
           currentItems.push({
-            id: 'item-' + Date.now() + Math.random().toString(36).substr(2, 4),
-            product_id: product ? product.id : null,
-            name: spokenName,
-            name_te: product ? product.name_te : spokenName,
-            hsn_code: product ? product.hsn_code : '',
+            id: 'item-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+            product_id: matchedProduct ? matchedProduct.id : null,
+            name: productName,
+            name_te: rawItem.product_name_te || (matchedProduct ? matchedProduct.name_te : ''),
             quantity: qty,
             unit: unit,
-            unit_price: rate,
-            gst_percent: gstRate,
-            taxable_value: taxable,
-            gst_amount: gstAmt,
-            line_total: taxable + gstAmt
+            unit_price: unitPrice,
+            gst_percent: gst
           });
+        }
+      });
+
+      let updatedCustomer = {
+        customer_id: prev.customer_id,
+        customer_name: prev.customer_name,
+        customer_phone: prev.customer_phone,
+        customer_address: prev.customer_address
+      };
+
+      if (extractedData.customer_name && (!prev.customer_id || prev.customer_name.includes('Cash Customer'))) {
+        const matchedCust = matcher.findCustomer(extractedData.customer_name, customersList);
+        if (matchedCust) {
+          updatedCustomer = {
+            customer_id: matchedCust.id,
+            customer_name: matchedCust.name,
+            customer_phone: matchedCust.phone || '',
+            customer_address: matchedCust.address || ''
+          };
+        } else {
+          updatedCustomer = {
+            customer_id: null,
+            customer_name: extractedData.customer_name,
+            customer_phone: '',
+            customer_address: ''
+          };
         }
       }
 
-      nextInv.items = currentItems;
-      const calculated = calculateInvoiceTotals(nextInv);
+      const updated = {
+        ...prev,
+        items: currentItems,
+        ...updatedCustomer,
+        document_type: extractedData.document_type || prev.document_type,
+        payment_mode: extractedData.payment_mode || prev.payment_mode
+      };
+
+      const calculated = calculateInvoiceTotals(updated);
       autoSave(calculated);
       return calculated;
     });
+
+    voiceManager.playFeedbackSound('success');
   };
 
-  const autoSave = (inv) => {
-    if (inv && inv.items && inv.items.length > 0) {
-      if (inv.document_type === 'quotation') {
-        store.saveQuotation(inv);
-      } else {
-        store.saveInvoice(inv);
-      }
-    }
-  };
-
-  const refineWithGemini = async (speechText, audioBlob = null) => {
+  const refineWithGemini = async (currentTranscript, audioBlob = null) => {
+    if (!currentTranscript || currentTranscript.trim().length < 3) return;
     setIsAnalyzing(true);
+
     try {
-      const result = await geminiService.processVoiceInput({
-        text: speechText,
-        audioBlob,
-        isDemo: false
-      });
-
-      if (result && result.success && result.transaction) {
-        const geminiTx = result.transaction;
-        if (geminiTx.items && geminiTx.items.length > 0) {
-          setActiveInvoice(prev => {
-            if (!prev) return prev;
-            let nextInv = { ...prev };
-            if (geminiTx.customer_name && geminiTx.customer_name !== 'Cash Customer / రిటైల్') {
-              nextInv.customer_name = geminiTx.customer_name;
-            }
-            if (geminiTx.document_type) {
-              nextInv.document_type = geminiTx.document_type;
-            }
-
-            const currentItems = [...nextInv.items];
-            for (const item of geminiTx.items) {
-              const existingIdx = currentItems.findIndex(i =>
-                (item.product_id && i.product_id === item.product_id) ||
-                i.name.toLowerCase() === item.name.toLowerCase()
-              );
-              if (existingIdx >= 0) {
-                currentItems[existingIdx].quantity = item.quantity;
-                currentItems[existingIdx].unit = item.unit;
-              } else {
-                currentItems.push(item);
-              }
-            }
-            nextInv.items = currentItems;
-            const calculated = calculateInvoiceTotals(nextInv);
-            autoSave(calculated);
-            return calculated;
-          });
-          voiceManager.playFeedbackSound('success');
-        }
+      const result = await geminiService.parseTeluguBillingVoice(currentTranscript, productsList, audioBlob);
+      if (result && result.items && result.items.length > 0) {
+        mergeExtractedItems(result);
+        store.logVoiceTransaction({
+          transcript: currentTranscript,
+          extracted_json: result,
+          processing_time_ms: result.latency_ms || 280,
+          overall_confidence: result.confidence || 0.96
+        });
       }
     } catch (err) {
-      console.warn('Gemini live refine error:', err);
+      console.warn('Gemini streaming parse error:', err);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  // Toggle Continuous Listening
   const toggleRecording = async () => {
-    if (voiceManager.isRecording) {
+    if (isRecording) {
       voiceManager.stopRecording();
       setIsRecording(false);
+      showToast('వాయిస్ రికార్డింగ్ ఆపబడింది.');
     } else {
-      const started = await voiceManager.startRecording(canvasRef.current);
-      if (started) {
+      try {
+        await voiceManager.startRecording(canvasRef.current);
         setIsRecording(true);
-        setTranscript('వింటున్నాను... మాట్లాడండి (Live Audio Stream Active)');
+        showToast('మైక్రోఫోన్ ఆన్ అయింది. తెలుగులో మాట్లాడండి...');
+      } catch (err) {
+        console.error('Failed to start recording:', err);
+        showToast('మైక్రోఫోన్ ప్రారంభించడం విఫలమైంది: ' + err.message);
       }
     }
   };
 
-  // Wire VoiceManager Callbacks
+  // Wire Voice Callbacks
   useEffect(() => {
-    voiceManager.onTranscriptUpdate = (liveText) => {
-      setTranscript(liveText || 'వింటున్నాను...');
-      if (liveText && liveText.trim().length > 2) {
-        // Fast local extraction
-        try {
-          const localExtracted = geminiService.parseTranscriptLocally(liveText.trim());
-          if (localExtracted && localExtracted.items && localExtracted.items.length > 0) {
-            mergeExtractedItems(localExtracted);
-          }
-        } catch (e) {}
-
-        // Debounced Gemini refinement
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = setTimeout(async () => {
-          await refineWithGemini(liveText.trim(), voiceManager.getAudioSnapshot());
-        }, 700);
+    voiceManager.onTranscript = (liveText) => {
+      setTranscript(liveText);
+      const localExtracted = geminiService.parseTranscriptLocally(liveText);
+      if (localExtracted && localExtracted.items && localExtracted.items.length > 0) {
+        mergeExtractedItems(localExtracted);
       }
+
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(() => {
+        refineWithGemini(liveText);
+      }, 700);
     };
 
     voiceManager.onLiveAudioSegment = async (blob, liveText) => {
@@ -320,7 +339,7 @@ export default function HomePage() {
         voiceManager.stopRecording();
       }
     };
-  }, []);
+  }, [productsList, customersList]);
 
   // Simulate spoken phrase (Sample chips)
   const simulateSpokenText = async (text) => {
@@ -398,7 +417,7 @@ export default function HomePage() {
         quantity: qty,
         unit: unit.trim(),
         unit_price: rate,
-        gst_percent: prev.include_gst ? 5 : 0
+        gst_percent: prev.include_gst ? 18 : 0
       }];
       const calculated = calculateInvoiceTotals({ ...prev, items });
       autoSave(calculated);
@@ -412,13 +431,19 @@ export default function HomePage() {
   };
 
   const printLiveBill = () => {
-    if (!activeInvoice) return;
+    if (!activeInvoice || activeInvoice.items.length === 0) {
+      showToast('బిల్లు ప్రింట్ చేయడానికి కనీసం ఒక వస్తువును చేర్చండి.');
+      return;
+    }
     autoSave(activeInvoice);
     documentGenerator.printDocument(activeInvoice, activeInvoice.document_type !== 'quotation');
   };
 
   const shareLiveBill = () => {
-    if (!activeInvoice) return;
+    if (!activeInvoice || activeInvoice.items.length === 0) {
+      showToast('బిల్లు షేర్ చేయడానికి కనీసం ఒక వస్తువును చేర్చండి.');
+      return;
+    }
     autoSave(activeInvoice);
     documentGenerator.shareOnWhatsApp(activeInvoice, activeInvoice.document_type !== 'quotation');
   };
@@ -428,8 +453,18 @@ export default function HomePage() {
   const isQuotation = activeInvoice.document_type === 'quotation';
   const biz = store.getBusiness();
 
+  // Filter Catalog Products
+  const filteredCatalog = productsList.filter(p => {
+    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    const q = catalogSearch.toLowerCase().trim();
+    const matchesSearch = !q ||
+      p.name.toLowerCase().includes(q) ||
+      (p.name_te && p.name_te.toLowerCase().includes(q));
+    return matchesCategory && matchesSearch;
+  });
+
   return (
-    <div className="view-container">
+    <div className="view-container" style={{ padding: '16px 20px' }}>
       {/* Toast Alert */}
       {toastMessage && (
         <div style={{
@@ -448,145 +483,238 @@ export default function HomePage() {
           alignItems: 'center',
           gap: '8px'
         }}>
-          <CheckCircleIcon size={16} />
+          <CheckCircleIcon size={16} style={{ color: '#22c55e' }} />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* POS Top Station Bar */}
-      <div className="pos-command-bar">
-        <div className="shortcut-group">
-          <span style={{ fontWeight: 700, color: 'var(--slate-900)' }}>Desktop Shortcuts:</span>
-          <span><kbd className="kbd-badge">F2</kbd> Mic Toggle</span>
-          <span>•</span>
-          <span><kbd className="kbd-badge">F4</kbd> Print Bill</span>
-          <span>•</span>
-          <span><kbd className="kbd-badge">F8</kbd> New Register</span>
-        </div>
-        <div className="terminal-id-tag">
-          <span>Terminal 01</span>
-          <span>•</span>
-          <span>Store: {biz.name}</span>
-        </div>
-      </div>
-
       {/* Workstation 2-Column Responsive Layout */}
       <div className="live-studio-layout">
 
-        {/* ================= LEFT COLUMN: AUDIO INPUT & VOICE CONSOLE ================= */}
+        {/* ================= LEFT COLUMN: VOICE COMMAND & QUICK CATALOG ================= */}
         <div className="voice-studio-panel">
 
-          {/* Console Audio Deck Card */}
-          <div className="console-card">
-            <div className="console-card-header">
-              <div className="console-title-group">
-                <div className="console-title">Voice Recognition Console</div>
-                <div className="console-subtitle">వాయిస్ బిల్లింగ్ నియంత్రణ డెక్</div>
+          {/* Voice Input Deck Card */}
+          <div className="console-card" style={{ padding: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--slate-900)' }}>
+                  Telugu Voice Command Terminal
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--slate-500)' }}>
+                  (మాట్లాడితే బిల్ రెడీ)
+                </div>
               </div>
               <div className={`audio-state-pill ${isRecording ? 'listening' : 'idle'}`}>
                 {isRecording && <span className="live-indicator-dot"></span>}
-                <span>{isRecording ? 'Listening...' : 'Ready'}</span>
+                <span>{isRecording ? '● Listening...' : 'Ready'}</span>
               </div>
             </div>
 
-            {/* Microphone Interaction Deck */}
-            <div className="mic-control-deck">
+            {/* Microphone Toggle Deck */}
+            <div className="mic-control-deck" style={{ padding: '10px 14px' }}>
               <button
                 type="button"
                 id="main-mic-btn"
                 className={`mic-toggle-btn ${isRecording ? 'recording' : ''}`}
                 onClick={toggleRecording}
-                title={isRecording ? 'Pause Audio Input' : 'Start Audio Input [F2]'}
+                title={isRecording ? 'Pause Voice Recording' : 'Start Voice Input [F2]'}
+                style={{ width: '46px', height: '46px' }}
               >
-                {isRecording ? <MicOffIcon size={22} /> : <MicIcon size={22} />}
+                {isRecording ? <MicOffIcon size={20} /> : <MicIcon size={20} />}
               </button>
               <div className="mic-status-copy">
-                <div className="mic-primary-text">
-                  {isRecording ? 'Listening continuously (హ్యాండ్స్-ఫ్రీ)' : 'Click to Speak (లేదా F2 నొక్కండి)'}
+                <div className="mic-primary-text" style={{ fontSize: '13px' }}>
+                  {isRecording ? 'Listening continuously (హ్యాండ్స్-ఫ్రీ మోడ్)' : 'Click to Speak (లేదా కీబోర్డులో F2 నొక్కండి)'}
                 </div>
-                <div className="mic-secondary-text">
-                  Speak items naturally in Telugu. Quantities and prices parse live into the register.
+                <div className="mic-secondary-text" style={{ fontSize: '11px' }}>
+                  Speak items naturally in Telugu. Quantities and prices parse live into the active register.
                 </div>
               </div>
             </div>
 
-            {/* Audio Waveform Canvas */}
-            <div className="audio-visualizer-box" style={{ display: isRecording ? 'flex' : 'none' }}>
-              <canvas ref={canvasRef} className="waveform-canvas" width="360" height="36"></canvas>
-              <div className="visualizer-meta">
-                <span>INPUT: ACTIVE MIC</span>
-                <span>STREAM: 16KHZ PCM</span>
-              </div>
+            {/* Visualizer Canvas */}
+            <div className="audio-visualizer-box" style={{ display: isRecording ? 'flex' : 'none', marginTop: '8px', padding: '6px 10px' }}>
+              <canvas ref={canvasRef} className="waveform-canvas" width="360" height="28"></canvas>
             </div>
 
-            {/* Transcript Monitor */}
-            <div className="transcript-terminal">
-              <div className="transcript-terminal-header">
-                <span>Real-Time Speech Stream</span>
-                {isAnalyzing && (
-                  <span style={{ color: 'var(--primary)', fontWeight: 700 }}>● Processing...</span>
-                )}
-              </div>
-              <div className="transcript-content-body">
+            {/* Transcript Stream Pill */}
+            <div style={{ marginTop: '10px', background: 'var(--slate-50)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '8px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 800, color: 'var(--slate-400)', textTransform: 'uppercase' }}>Live Stream:</span>
+              <span style={{ color: 'var(--slate-800)', fontStyle: 'italic', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {transcript}
-              </div>
+              </span>
+              {isAnalyzing && <span style={{ fontSize: '10px', color: 'var(--primary-dark)', fontWeight: 700 }}>● Processing...</span>}
+            </div>
+
+            {/* Quick Test Voice Chips */}
+            <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginTop: '10px', paddingBottom: '2px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--slate-400)', alignSelf: 'center', whiteSpace: 'nowrap' }}>Test:</span>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: '11px', padding: '3px 8px', whiteSpace: 'nowrap' }}
+                onClick={() => simulateSpokenText('రమేష్కి పది బస్తాల సిమెంట్, రెండు పెయింట్ బకెట్లు')}
+              >
+                10 బస్తాల సిమెంట్, 2 పెయింట్
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: '11px', padding: '3px 8px', whiteSpace: 'nowrap' }}
+                onClick={() => simulateSpokenText('వంద గ్రాములు లవంగాలు, వంద గ్రాములు గసగసాలు, ఒక ప్యాకెట్ బాస్మతి బియ్యం')}
+              >
+                100g లవంగాలు, 1 pkt బాస్మతి
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: '11px', padding: '3px 8px', whiteSpace: 'nowrap' }}
+                onClick={() => simulateSpokenText('ఐదు కిలోల బియ్యం, రెండు కిలోల కందిపప్పు')}
+              >
+                5 kg rice, 2 kg కందిపప్పు
+              </button>
             </div>
           </div>
 
-          {/* Customer & Document Mode Card */}
-          <div className="console-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <label className="form-label" style={{ margin: 0 }}>
-                Document Type / పత్రం రకం
-              </label>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <button
-                  type="button"
-                  className={`cat-tab ${!isQuotation ? 'active' : ''}`}
-                  style={{ padding: '3px 10px', fontSize: '11px' }}
-                  onClick={() => {
-                    setActiveInvoice(prev => {
-                      const next = { ...prev, document_type: 'invoice' };
-                      autoSave(next);
-                      return next;
-                    });
-                  }}
-                >
-                  Tax Invoice
-                </button>
-                <button
-                  type="button"
-                  className={`cat-tab ${isQuotation ? 'active' : ''}`}
-                  style={{ padding: '3px 10px', fontSize: '11px' }}
-                  onClick={() => {
-                    setActiveInvoice(prev => {
-                      const next = { ...prev, document_type: 'quotation' };
-                      autoSave(next);
-                      return next;
-                    });
-                  }}
-                >
-                  Quotation
-                </button>
+          {/* Quick-Add Product Catalogue Section */}
+          <div className="quick-catalog-section">
+            <div className="quick-catalog-header">
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--slate-900)' }}>
+                  Quick-Add Catalogue
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--slate-500)' }}>
+                  Click item to add directly to the active bill
+                </div>
+              </div>
+
+              {/* Instant Filter Search */}
+              <div style={{ position: 'relative', width: '200px' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ padding: '5px 8px 5px 28px', fontSize: '12px', height: '30px' }}
+                  placeholder="Search catalog..."
+                  value={catalogSearch}
+                  onChange={(e) => setCatalogSearch(e.target.value)}
+                />
+                <SearchIcon size={14} style={{ position: 'absolute', left: '8px', top: '8px', color: 'var(--slate-400)' }} />
               </div>
             </div>
 
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label className="form-label" style={{ margin: 0 }}>
-                  Customer Directory / కస్టమర్
-                </label>
-                {activeInvoice.customer_id && (
-                  <Link href={`/customer/${activeInvoice.customer_id}`} style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 700, textDecoration: 'none' }}>
-                    Khata Ledger →
-                  </Link>
-                )}
-              </div>
+            {/* Category Tabs */}
+            <div className="category-pill-strip">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  type="button"
+                  className={`cat-tab ${selectedCategory === cat ? 'active' : ''}`}
+                  style={{ padding: '3px 10px', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  onClick={() => setSelectedCategory(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
 
-              {/* Customer Select Dropdown */}
+            {/* Product Quick-Add Grid */}
+            <div className="quick-catalog-grid">
+              {filteredCatalog.length === 0 ? (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '24px', color: 'var(--slate-400)', fontSize: '12px' }}>
+                  No items match this search.
+                </div>
+              ) : (
+                filteredCatalog.map(p => {
+                  const stock = p.current_stock !== undefined ? p.current_stock : 0;
+                  const reorder = p.reorder_level || 5;
+                  return (
+                    <div
+                      key={p.id}
+                      className="product-quick-card"
+                      onClick={() => addProductToBill(p)}
+                      title={`Add 1 ${p.unit} of ${p.name} to bill`}
+                    >
+                      <div>
+                        <div className="product-card-title">{p.name}</div>
+                        {p.name_te && <div className="product-card-te">{p.name_te}</div>}
+                      </div>
+                      <div className="product-card-footer">
+                        <div className="product-card-price">
+                          ₹{p.selling_price}
+                          <span className="product-card-unit">/{p.unit}</span>
+                        </div>
+                        {stock <= 0 ? (
+                          <span className="stock-pill out" style={{ fontSize: '9px', padding: '1px 4px' }}>0 {p.unit}</span>
+                        ) : stock <= reorder ? (
+                          <span className="stock-pill low" style={{ fontSize: '9px', padding: '1px 4px' }}>{stock} {p.unit}</span>
+                        ) : (
+                          <span className="stock-pill in-stock" style={{ fontSize: '9px', padding: '1px 4px' }}>{stock}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+        </div>
+
+        {/* ================= RIGHT COLUMN: REGISTER BILL & TENDER TERMINAL ================= */}
+        <div className="pos-register-panel">
+          
+          {/* Register Top Bar */}
+          <div className="register-top-bar">
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px', fontWeight: 900, color: 'var(--slate-900)', fontVariantNumeric: 'tabular-nums' }}>
+                  {activeInvoice.invoice_number}
+                </span>
+                <span className="invoice-badge-status saved">
+                  ● Saved
+                </span>
+                <div style={{ display: 'inline-flex', gap: '2px', marginLeft: '6px' }}>
+                  <button
+                    type="button"
+                    className={`cat-tab ${!isQuotation ? 'active' : ''}`}
+                    style={{ padding: '2px 8px', fontSize: '10px' }}
+                    onClick={() => {
+                      setActiveInvoice(prev => {
+                        const next = { ...prev, document_type: 'invoice' };
+                        autoSave(next);
+                        return next;
+                      });
+                    }}
+                  >
+                    Tax Invoice
+                  </button>
+                  <button
+                    type="button"
+                    className={`cat-tab ${isQuotation ? 'active' : ''}`}
+                    style={{ padding: '2px 8px', fontSize: '10px' }}
+                    onClick={() => {
+                      setActiveInvoice(prev => {
+                        const next = { ...prev, document_type: 'quotation' };
+                        autoSave(next);
+                        return next;
+                      });
+                    }}
+                  >
+                    Quotation
+                  </button>
+                </div>
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--slate-500)', marginTop: '3px' }}>
+                {isQuotation ? 'Price Quotation' : 'GST Tax Invoice'} • Date: {activeInvoice.date}
+              </div>
+            </div>
+
+            {/* Customer Selector Dropdown */}
+            <div style={{ minWidth: '190px' }}>
               <select
                 className="form-input"
-                style={{ padding: '6px 10px', fontSize: '12px', marginBottom: '6px' }}
+                style={{ padding: '4px 8px', fontSize: '12px', height: '30px' }}
                 value={activeInvoice.customer_id || ''}
                 onChange={(e) => {
                   const custId = e.target.value;
@@ -622,121 +750,51 @@ export default function HomePage() {
                   }
                 }}
               >
-                <option value="">👤 Walk-in / Cash Customer</option>
+                <option value="">Walk-in / Cash Customer</option>
                 {customersList.map(c => (
                   <option key={c.id} value={c.id}>
-                    {c.name} {c.current_balance > 0 ? `(బాకీ: ₹${c.current_balance})` : ''} - {c.phone}
+                    {c.name} {c.current_balance > 0 ? `(బాకీ: ₹${c.current_balance})` : ''}
                   </option>
                 ))}
               </select>
 
-              {/* Manual Name Override */}
-              <input
-                type="text"
-                className="form-input"
-                style={{ padding: '6px 10px', fontSize: '12px' }}
-                value={activeInvoice.customer_name}
-                placeholder="కస్టమర్ పేరు టైప్ చేయండి..."
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setActiveInvoice(prev => {
-                    const next = { ...prev, customer_name: val };
-                    autoSave(next);
-                    return next;
-                  });
-                }}
-              />
-
-              {/* Customer Khata Balance Alert */}
-              {activeInvoice.customer_id && (() => {
+              {/* Customer Khata Balance Alert if customer selected */}
+              {(() => {
+                if (!activeInvoice.customer_id) return null;
                 const cust = customersList.find(c => c.id === activeInvoice.customer_id);
                 if (!cust) return null;
-                const bal = cust.current_balance || 0;
                 return (
-                  <div style={{ marginTop: '8px', padding: '6px 10px', borderRadius: 'var(--radius-sm)', background: bal > 0 ? 'var(--accent-red-light)' : 'var(--primary-light)', border: `1px solid ${bal > 0 ? 'var(--accent-red-border)' : 'var(--primary-border)'}`, fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: bal > 0 ? 'var(--accent-red)' : 'var(--primary-dark)', fontWeight: 700 }}>
-                      {bal > 0 ? `⚠️ మునుపటి బాకీ: ₹${bal.toLocaleString('en-IN')}` : '✓ ఖాతా క్లియర్ (No Dues)'}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '3px', fontSize: '10px' }}>
+                    <span style={{ color: cust.current_balance > 0 ? 'var(--accent-red)' : '#16a34a', fontWeight: 700 }}>
+                      {cust.current_balance > 0 ? `బాకీ: ₹${cust.current_balance.toLocaleString('en-IN')}` : '₹0 Due'}
                     </span>
-                    <span style={{ color: 'var(--slate-500)' }}>
-                      పరిమితి: ₹{(cust.credit_limit || 10000).toLocaleString('en-IN')}
-                    </span>
+                    <Link href={`/customer/${cust.id}`} style={{ color: 'var(--primary-dark)', textDecoration: 'none', fontWeight: 600 }}>
+                      Khata Ledger →
+                    </Link>
                   </div>
                 );
               })()}
             </div>
           </div>
 
-          {/* Quick Voice Simulation Presets */}
-          <div className="console-card">
-            <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate-500)', letterSpacing: '0.3px' }}>
-              Sample Spoken Prompts / పరీక్ష వాక్యాలు
-            </div>
-            <div className="preset-prompt-list">
-              <div className="preset-prompt-item" onClick={() => simulateSpokenText('రమేష్కి పది బస్తాల సిమెంట్, రెండు పెయింట్ బకెట్లు')}>
-                <span>“రమేష్కి 10 బస్తాల సిమెంట్, 2 పెయింట్ బకెట్లు”</span>
-                <span className="preset-chip-action">Simulate</span>
-              </div>
-              <div className="preset-prompt-item" onClick={() => simulateSpokenText('వంద గ్రాములు లవంగాలు, వంద గ్రాములు గసగసాలు, ఒక ప్యాకెట్ బాస్మతి బియ్యం, ఒక కిలో పంచదార')}>
-                <span>“100g లవంగాలు, 100g గసగసాలు, 1 pkt బాస్మతి”</span>
-                <span className="preset-chip-action">Simulate</span>
-              </div>
-              <div className="preset-prompt-item" onClick={() => simulateSpokenText('ఐదు కిలోల బియ్యం, రెండు కిలోల కందిపప్పు, ఒక కిలో మినప గుళ్ళు')}>
-                <span>“5 kg rice, 2 kg కందిపప్పు, 1 kg మినప గుళ్ళు”</span>
-                <span className="preset-chip-action">Simulate</span>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        {/* ================= RIGHT COLUMN: REGISTER / ACTIVE INVOICE TERMINAL ================= */}
-        <div className="pos-register-panel">
-          
-          {/* Register Top Bar */}
-          <div className="register-top-bar">
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--slate-900)' }}>
-                  {activeInvoice.invoice_number}
-                </span>
-                <span className="invoice-badge-status saved">
-                  ● Auto-Saved
-                </span>
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--slate-500)', marginTop: '2px' }}>
-                {isQuotation ? 'Quotation Register' : 'Tax Invoice Register'} • {activeInvoice.date}
-              </div>
-            </div>
-
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--slate-700)' }}>
-                👤 {activeInvoice.customer_name}
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--slate-400)' }}>
-                Items: {items.length} line items
-              </div>
-            </div>
-          </div>
-
-          {/* Spoken Items Register Table / Cards */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+          {/* Line Items List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minHeight: '140px', maxHeight: '310px', overflowY: 'auto', paddingRight: '2px' }}>
             {items.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '48px 16px', background: 'var(--slate-50)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-strong)', color: 'var(--slate-500)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', flex: 1 }}>
-                <MicIcon size={32} style={{ color: 'var(--slate-400)' }} />
-                <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--slate-800)' }}>
-                  Register Empty • Ready for Voice Input
+              <div style={{ textAlign: 'center', padding: '32px 16px', background: 'var(--slate-50)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-subtle)', color: 'var(--slate-500)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                <PackageIcon size={26} style={{ color: 'var(--slate-400)' }} />
+                <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--slate-700)' }}>
+                  Bill is empty • Ready for items
                 </div>
-                <div style={{ fontSize: '12px', maxWidth: '340px', lineHeight: 1.4 }}>
-                  Speak items into the microphone on the left, or add manual line items below.
+                <div style={{ fontSize: '11px', color: 'var(--slate-400)' }}>
+                  Speak in Telugu or click any product tile on the left
                 </div>
-                <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: '6px' }} onClick={promptAddItem}>
-                  <PlusIcon size={14} /> + Add Item Manually
+                <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: '4px', fontSize: '11px', padding: '3px 8px' }} onClick={promptAddItem}>
+                  <PlusIcon size={12} /> Custom Line Item
                 </button>
               </div>
             ) : (
               items.map((item, idx) => (
-                <div key={item.id || idx} className="pos-item-card">
-                  {/* Row 1: Item Name, Rate, Stock Badge */}
+                <div key={item.id || idx} className="pos-item-card" style={{ padding: '8px 10px', margin: 0 }}>
                   <div className="item-top-row">
                     <div style={{ flex: 1 }}>
                       <input
@@ -744,65 +802,51 @@ export default function HomePage() {
                         value={item.name || ''}
                         placeholder="Item Description"
                         className="item-name-input"
+                        style={{ fontSize: '13px', padding: '1px 2px' }}
                         onChange={(e) => updateItemName(idx, e.target.value)}
                       />
-                      <div className="item-sub-meta">
+                      <div className="item-sub-meta" style={{ fontSize: '10px' }}>
                         <span>Unit: <strong>{item.unit || 'pcs'}</strong></span>
                         {item.gst_percent ? <span>• GST: {item.gst_percent}%</span> : null}
-                        
-                        {/* Real-time Inventory Stock Badge */}
-                        {(() => {
-                          const prod = item.product_id ? store.getProductById(item.product_id) : null;
-                          if (!prod) return null;
-                          const stock = prod.current_stock || 0;
-                          const reorder = prod.reorder_level || 5;
-                          if (stock <= 0) {
-                            return <span className="stock-pill out">● Out of Stock (0 {prod.unit})</span>;
-                          } else if (stock <= reorder) {
-                            return <span className="stock-pill low">● Low: {stock} {prod.unit}</span>;
-                          } else {
-                            return <span className="stock-pill in-stock">● In Stock: {stock} {prod.unit}</span>;
-                          }
-                        })()}
                       </div>
                     </div>
 
                     <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--slate-900)' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--slate-900)', fontVariantNumeric: 'tabular-nums' }}>
                         {documentGenerator.formatCurrency(item.line_total)}
                       </div>
                     </div>
                   </div>
 
-                  {/* Row 2: Stepper, Price Input, Delete */}
-                  <div className="item-bottom-controls">
+                  <div className="item-bottom-controls" style={{ padding: '4px 0 0 0', marginTop: '4px' }}>
                     <div className="qty-stepper-control">
-                      <button type="button" className="stepper-btn" onClick={() => updateItemQty(idx, -1)}>-</button>
-                      <span className="stepper-value-display">{item.quantity} {item.unit || ''}</span>
-                      <button type="button" className="stepper-btn" onClick={() => updateItemQty(idx, 1)}>+</button>
+                      <button type="button" className="stepper-btn" style={{ width: '24px', height: '24px' }} onClick={() => updateItemQty(idx, -1)}>-</button>
+                      <span className="stepper-value-display" style={{ fontSize: '12px', minWidth: '40px', padding: '0 6px' }}>{item.quantity} {item.unit || ''}</span>
+                      <button type="button" className="stepper-btn" style={{ width: '24px', height: '24px' }} onClick={() => updateItemQty(idx, 1)}>+</button>
                     </div>
 
-                    <div className="rate-input-box">
-                      <span>Rate: ₹</span>
+                    <div className="rate-input-box" style={{ fontSize: '11px' }}>
+                      <span>₹</span>
                       <input
                         type="number"
                         min="0"
                         step="any"
                         value={item.unit_price || 0}
                         className="rate-input"
+                        style={{ width: '70px', padding: '2px 4px', fontSize: '12px' }}
                         onChange={(e) => updateItemPrice(idx, e.target.value)}
                       />
-                      <span style={{ fontSize: '11px', color: 'var(--slate-400)' }}>/{item.unit || 'pcs'}</span>
+                      <span style={{ fontSize: '10px', color: 'var(--slate-400)' }}>/{item.unit || 'pcs'}</span>
                     </div>
 
                     <button
                       type="button"
-                      className="btn btn-danger-outline btn-sm"
-                      style={{ padding: '3px 8px', fontSize: '11px' }}
+                      className="btn btn-outline btn-sm"
+                      style={{ padding: '2px 6px', fontSize: '10px', color: 'var(--accent-red)', borderColor: '#fca5a5' }}
                       onClick={() => removeItem(idx)}
                       title="Remove item"
                     >
-                      <TrashIcon size={13} /> Remove
+                      <TrashIcon size={12} />
                     </button>
                   </div>
                 </div>
@@ -811,234 +855,240 @@ export default function HomePage() {
           </div>
 
           {items.length > 0 && (
-            <>
-              {/* Add / Reset Action Bar */}
-              <div style={{ display: 'flex', gap: '8px', margin: '10px 0 12px 0' }}>
-                <button type="button" className="btn btn-outline btn-sm" style={{ flex: 1 }} onClick={promptAddItem}>
-                  <PlusIcon size={14} /> + Add Item
-                </button>
-                <button type="button" className="btn btn-outline btn-sm" style={{ color: 'var(--accent-red)' }} onClick={startNewBill}>
-                  <RefreshCwIcon size={14} /> Reset Register [F8]
-                </button>
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+              <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={promptAddItem}>
+                <PlusIcon size={12} /> Add Custom Item
+              </button>
+            </div>
+          )}
 
-              {/* Totals Summary Ledger */}
-              <div className="totals-ledger-box">
-                <div className="totals-line-row">
-                  <span>Subtotal / సబ్ టోటల్:</span>
-                  <span style={{ fontWeight: 600 }}>{documentGenerator.formatCurrency(activeInvoice.subtotal)}</span>
-                </div>
+          {/* Permanently Anchored Totals Summary Ledger */}
+          <div className="totals-ledger-box" style={{ padding: '10px 14px', marginTop: '10px' }}>
+            <div className="totals-line-row">
+              <span style={{ fontSize: '12px' }}>Subtotal / సబ్ టోటల్:</span>
+              <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{documentGenerator.formatCurrency(activeInvoice.subtotal)}</span>
+            </div>
 
-                <div className="totals-line-row">
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    Discount / డిస్కౌంట్:
+            <div className="totals-line-row">
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                Discount:
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={activeInvoice.discount_percent || 0}
+                  style={{ width: '40px', padding: '1px 3px', fontSize: '11px', border: '1px solid var(--border-subtle)', borderRadius: '3px' }}
+                  onChange={(e) => {
+                    const val = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                    setActiveInvoice(prev => {
+                      const next = calculateInvoiceTotals({ ...prev, discount_percent: val });
+                      autoSave(next);
+                      return next;
+                    });
+                  }}
+                /> %
+              </span>
+              <span style={{ color: activeInvoice.discount_amount > 0 ? 'var(--accent-red)' : 'inherit', fontVariantNumeric: 'tabular-nums' }}>
+                -{documentGenerator.formatCurrency(activeInvoice.discount_amount || 0)}
+              </span>
+            </div>
+
+            <div className="totals-line-row">
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                GST (CGST + SGST):
+                <label style={{ fontSize: '11px', cursor: 'pointer', marginLeft: '4px' }}>
+                  <input
+                    type="checkbox"
+                    checked={activeInvoice.include_gst !== false}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setActiveInvoice(prev => {
+                        const next = calculateInvoiceTotals({ ...prev, include_gst: checked });
+                        autoSave(next);
+                        return next;
+                      });
+                    }}
+                  /> Apply
+                </label>
+              </span>
+              <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{documentGenerator.formatCurrency(activeInvoice.gst_amount || 0)}</span>
+            </div>
+
+            <div className="totals-line-row grand-total-row" style={{ marginTop: '6px', paddingTop: '6px' }}>
+              <span style={{ fontSize: '15px' }}>Grand Total / మొత్తం:</span>
+              <span className="grand-total-val" style={{ fontSize: '20px', fontVariantNumeric: 'tabular-nums' }}>
+                {documentGenerator.formatCurrency(activeInvoice.total)}
+              </span>
+            </div>
+          </div>
+
+          {/* Payment Tender Console */}
+          <div style={{ marginTop: '10px' }}>
+            <div className="payment-selector-strip" style={{ marginTop: 0 }}>
+              <button
+                type="button"
+                className={`payment-chip ${activeInvoice.payment_mode === 'cash' ? 'selected' : ''}`}
+                style={{ padding: '6px 8px', fontSize: '11px' }}
+                onClick={() => {
+                  setActiveInvoice(prev => {
+                    const next = { ...prev, payment_mode: 'cash', payment_status: 'paid' };
+                    autoSave(next);
+                    return next;
+                  });
+                }}
+              >
+                <CashIcon size={15} />
+                <span>Cash (నగదు)</span>
+              </button>
+
+              <button
+                type="button"
+                className={`payment-chip ${activeInvoice.payment_mode === 'upi' ? 'selected' : ''}`}
+                style={{ padding: '6px 8px', fontSize: '11px' }}
+                onClick={() => {
+                  setActiveInvoice(prev => {
+                    const next = { ...prev, payment_mode: 'upi', payment_status: 'paid' };
+                    autoSave(next);
+                    return next;
+                  });
+                  if (activeInvoice.total > 0) {
+                    setShowUpiModal(true);
+                  }
+                }}
+              >
+                <QrCodeIcon size={15} />
+                <span>UPI / QR</span>
+              </button>
+
+              <button
+                type="button"
+                className={`payment-chip credit ${activeInvoice.payment_mode === 'credit' ? 'selected credit' : ''}`}
+                style={{ padding: '6px 8px', fontSize: '11px' }}
+                onClick={() => {
+                  if (!activeInvoice.customer_id) {
+                    showToast('బాకీ కోసం కస్టమర్‌ను సెలెక్ట్ చేయండి.');
+                  }
+                  setActiveInvoice(prev => {
+                    const next = { ...prev, payment_mode: 'credit', payment_status: 'credit' };
+                    autoSave(next);
+                    return next;
+                  });
+                }}
+              >
+                <CreditCardIcon size={15} />
+                <span>Udhaar (బాకీ)</span>
+              </button>
+
+              <button
+                type="button"
+                className={`payment-chip ${activeInvoice.payment_mode === 'partial' ? 'selected' : ''}`}
+                style={{ padding: '6px 8px', fontSize: '11px' }}
+                onClick={() => {
+                  setActiveInvoice(prev => {
+                    const next = { ...prev, payment_mode: 'partial', payment_status: 'partial' };
+                    autoSave(next);
+                    return next;
+                  });
+                }}
+              >
+                <RefreshCwIcon size={15} />
+                <span>Split / ఇతర</span>
+              </button>
+            </div>
+
+            {/* Cash Tender & Change Return Calculator */}
+            {activeInvoice.payment_mode === 'cash' && activeInvoice.total > 0 && (
+              <div className="tender-console" style={{ padding: '8px 10px', marginTop: '8px' }}>
+                <div className="tender-calc-row">
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--slate-700)' }}>
+                    Cash Tendered:
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px' }}>₹</span>
                     <input
                       type="number"
-                      min="0"
-                      max="100"
-                      value={activeInvoice.discount_percent || 0}
-                      style={{ width: '45px', padding: '2px 4px', fontSize: '11px', border: '1px solid var(--border-subtle)', borderRadius: '4px' }}
-                      onChange={(e) => {
-                        const val = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
-                        setActiveInvoice(prev => {
-                          const next = calculateInvoiceTotals({ ...prev, discount_percent: val });
-                          autoSave(next);
-                          return next;
-                        });
-                      }}
-                    /> %
-                  </span>
-                  <span style={{ color: activeInvoice.discount_amount > 0 ? 'var(--accent-red)' : 'inherit' }}>
-                    -{documentGenerator.formatCurrency(activeInvoice.discount_amount || 0)}
-                  </span>
-                </div>
-
-                <div className="totals-line-row">
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    GST (CGST + SGST):
-                    <label style={{ fontSize: '11px', cursor: 'pointer', marginLeft: '4px' }}>
-                      <input
-                        type="checkbox"
-                        checked={activeInvoice.include_gst !== false}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setActiveInvoice(prev => {
-                            const next = calculateInvoiceTotals({ ...prev, include_gst: checked });
-                            autoSave(next);
-                            return next;
-                          });
-                        }}
-                      /> Apply GST
-                    </label>
-                  </span>
-                  <span style={{ fontWeight: 600 }}>{documentGenerator.formatCurrency(activeInvoice.gst_amount || 0)}</span>
-                </div>
-
-                <div className="totals-line-row grand-total-row">
-                  <span>Grand Total / మొత్తం:</span>
-                  <span className="grand-total-val">{documentGenerator.formatCurrency(activeInvoice.total)}</span>
-                </div>
-              </div>
-
-              {/* Payment Mode Selector Strip */}
-              <div style={{ marginTop: '12px' }}>
-                <label className="form-label" style={{ marginBottom: '4px' }}>
-                  Payment Method / చెల్లింపు విధానం
-                </label>
-                <div className="payment-selector-strip">
-                  <button
-                    type="button"
-                    className={`payment-chip ${activeInvoice.payment_mode === 'cash' ? 'selected' : ''}`}
-                    onClick={() => {
-                      setActiveInvoice(prev => {
-                        const next = { ...prev, payment_mode: 'cash', payment_status: 'paid' };
-                        autoSave(next);
-                        return next;
-                      });
-                    }}
-                  >
-                    <CashIcon size={17} />
-                    <span>Cash (నగదు)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`payment-chip ${activeInvoice.payment_mode === 'upi' ? 'selected' : ''}`}
-                    onClick={() => {
-                      setActiveInvoice(prev => {
-                        const next = { ...prev, payment_mode: 'upi', payment_status: 'paid' };
-                        autoSave(next);
-                        return next;
-                      });
-                      setShowUpiModal(true);
-                    }}
-                  >
-                    <QrCodeIcon size={17} />
-                    <span>UPI / QR</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`payment-chip credit ${activeInvoice.payment_mode === 'credit' ? 'selected credit' : ''}`}
-                    onClick={() => {
-                      if (!activeInvoice.customer_id) {
-                        showToast('బాకీ కోసం కస్టమర్‌ను సెలెక్ట్ చేయండి.');
-                      }
-                      setActiveInvoice(prev => {
-                        const next = { ...prev, payment_mode: 'credit', payment_status: 'credit' };
-                        autoSave(next);
-                        return next;
-                      });
-                    }}
-                  >
-                    <CreditCardIcon size={17} />
-                    <span>Udhaar (బాకీ)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`payment-chip ${activeInvoice.payment_mode === 'partial' ? 'selected' : ''}`}
-                    onClick={() => {
-                      setActiveInvoice(prev => {
-                        const next = { ...prev, payment_mode: 'partial', payment_status: 'partial' };
-                        autoSave(next);
-                        return next;
-                      });
-                    }}
-                  >
-                    <RefreshCwIcon size={17} />
-                    <span>Split (పాక్షికం)</span>
-                  </button>
-                </div>
-
-                {/* Cash Tender & Change Return Calculator */}
-                {activeInvoice.payment_mode === 'cash' && (
-                  <div className="tender-console">
-                    <div className="tender-calc-row">
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--slate-700)' }}>
-                        Cash Tendered / ఇచ్చిన నగదు:
-                      </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontWeight: 700 }}>₹</span>
-                        <input
-                          type="number"
-                          className="form-input"
-                          style={{ width: '110px', padding: '4px 8px', fontWeight: 800, textAlign: 'right' }}
-                          value={cashTendered}
-                          onChange={(e) => setCashTendered(e.target.value)}
-                          placeholder={String(Math.ceil(activeInvoice.total))}
-                        />
-                      </div>
-                    </div>
-                    <div className="tender-quick-buttons">
-                      <button type="button" className="tender-chip-button" onClick={() => setCashTendered(String(Math.ceil(activeInvoice.total)))}>Exact</button>
-                      <button type="button" className="tender-chip-button" onClick={() => setCashTendered(String(Math.ceil(activeInvoice.total) + 100))}>+ ₹100</button>
-                      <button type="button" className="tender-chip-button" onClick={() => setCashTendered(String(Math.ceil(activeInvoice.total) + 200))}>+ ₹200</button>
-                      <button type="button" className="tender-chip-button" onClick={() => setCashTendered(String(Math.ceil(activeInvoice.total) + 500))}>+ ₹500</button>
-                      <button type="button" className="tender-chip-button" onClick={() => setCashTendered('2000')}>₹2000 Note</button>
-                    </div>
-                    {parseFloat(cashTendered) >= activeInvoice.total && (
-                      <div className="change-due-box">
-                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#065f46' }}>
-                          Return Change / చిల్లర:
-                        </span>
-                        <span style={{ fontSize: '17px', fontWeight: 900, color: '#065f46' }}>
-                          ₹{(parseFloat(cashTendered) - activeInvoice.total).toFixed(2)}
-                        </span>
-                      </div>
-                    )}
+                      className="form-input"
+                      style={{ width: '90px', padding: '3px 6px', fontWeight: 800, textAlign: 'right', fontSize: '12px' }}
+                      value={cashTendered}
+                      onChange={(e) => setCashTendered(e.target.value)}
+                      placeholder={String(Math.ceil(activeInvoice.total))}
+                    />
                   </div>
-                )}
-
-                {/* Credit Notice */}
-                {activeInvoice.payment_mode === 'credit' && (
-                  <div style={{ marginTop: '8px', padding: '8px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--accent-amber-light)', border: '1px solid var(--accent-amber-border)', fontSize: '12px', color: 'var(--accent-amber)' }}>
-                    <strong>Udhaar Record:</strong> Invoice total of ₹{activeInvoice.total.toFixed(2)} will be debited to customer Khata.
+                </div>
+                <div className="tender-quick-buttons" style={{ marginTop: '4px' }}>
+                  <button type="button" className="tender-chip-button" style={{ padding: '2px 6px', fontSize: '10px' }} onClick={() => setCashTendered(String(Math.ceil(activeInvoice.total)))}>Exact</button>
+                  <button type="button" className="tender-chip-button" style={{ padding: '2px 6px', fontSize: '10px' }} onClick={() => setCashTendered(String(Math.ceil(activeInvoice.total) + 100))}>+₹100</button>
+                  <button type="button" className="tender-chip-button" style={{ padding: '2px 6px', fontSize: '10px' }} onClick={() => setCashTendered(String(Math.ceil(activeInvoice.total) + 500))}>+₹500</button>
+                  <button type="button" className="tender-chip-button" style={{ padding: '2px 6px', fontSize: '10px' }} onClick={() => setCashTendered('2000')}>₹2000 Note</button>
+                </div>
+                {parseFloat(cashTendered) >= activeInvoice.total && (
+                  <div className="change-due-box" style={{ padding: '4px 8px', marginTop: '4px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#065f46' }}>
+                      Return Change / చిల్లర:
+                    </span>
+                    <span style={{ fontSize: '14px', fontWeight: 900, color: '#065f46', fontVariantNumeric: 'tabular-nums' }}>
+                      ₹{(parseFloat(cashTendered) - activeInvoice.total).toFixed(2)}
+                    </span>
                   </div>
                 )}
               </div>
+            )}
+          </div>
 
-              {/* Action Buttons Toolbar */}
-              <div className="action-grid-buttons">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={printLiveBill}
-                  title="Print Standard A4 Invoice [Shortcut: F4]"
-                >
-                  <PrinterIcon size={16} /> Print Bill [F4]
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => {
-                    if (!activeInvoice) return;
-                    autoSave(activeInvoice);
-                    documentGenerator.printThermal(activeInvoice);
-                  }}
-                  title="Print 80mm/58mm Thermal Receipt Slip"
-                >
-                  <FileTextIcon size={16} /> Thermal Slip
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => setShowUpiModal(true)}
-                  style={{ color: 'var(--primary-dark)', borderColor: 'var(--primary-border)', background: 'var(--primary-light)' }}
-                  title="Display UPI QR Code on Counter Screen"
-                >
-                  <QrCodeIcon size={16} /> UPI QR Screen
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={shareLiveBill}
-                >
-                  <WhatsAppIcon size={16} /> WhatsApp
-                </button>
-              </div>
-            </>
-          )}
+          {/* Action Buttons Toolbar */}
+          <div className="action-grid-buttons" style={{ marginTop: '10px' }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={printLiveBill}
+              title="Print Standard A4 Invoice [Shortcut: F4]"
+              style={{ fontWeight: 800 }}
+              disabled={items.length === 0}
+            >
+              <PrinterIcon size={15} /> Complete & Print [F4]
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => {
+                if (!activeInvoice || items.length === 0) return;
+                autoSave(activeInvoice);
+                documentGenerator.printThermal(activeInvoice);
+              }}
+              title="Print Thermal Receipt Slip"
+              disabled={items.length === 0}
+            >
+              Thermal Slip
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setShowUpiModal(true)}
+              style={{ color: 'var(--primary-dark)', borderColor: 'var(--primary-border)', background: 'var(--primary-light)' }}
+              title="Display UPI QR Code on Counter Screen"
+              disabled={activeInvoice.total === 0}
+            >
+              <QrCodeIcon size={15} /> UPI QR
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={shareLiveBill}
+              disabled={items.length === 0}
+              style={{ background: '#16a34a', borderColor: '#16a34a', color: '#ffffff' }}
+            >
+              <WhatsAppIcon size={15} /> WhatsApp
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={startNewBill}
+              title="Clear register for next customer [F8]"
+              style={{ color: 'var(--accent-red)', borderColor: '#fecaca' }}
+            >
+              <RefreshCwIcon size={13} /> Reset [F8]
+            </button>
+          </div>
 
         </div>
 
@@ -1049,8 +1099,8 @@ export default function HomePage() {
         <div className="modal-backdrop-overlay" onClick={() => setShowUpiModal(false)}>
           <div className="modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ padding: '24px', textAlign: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--slate-900)' }}>
-                Bharat UPI Counter Terminal
+              <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--slate-900)' }}>
+                Scan to Pay via UPI
               </div>
               <button
                 type="button"
@@ -1075,28 +1125,30 @@ export default function HomePage() {
             <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary-dark)', marginBottom: '4px' }}>
               {documentGenerator.formatCurrency(activeInvoice.total)}
             </div>
-            <div style={{ fontSize: '12px', fontFamily: 'monospace', color: 'var(--slate-500)', marginBottom: '18px' }}>
-              UPI ID: <strong>{biz.upi_id}</strong>
+            <div style={{ fontSize: '11px', color: 'var(--slate-500)' }}>
+              UPI ID: <strong>{biz.upi_id}</strong> • Bill #{activeInvoice.invoice_number}
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ flex: 1, padding: '10px' }}
-                onClick={() => {
-                  setShowUpiModal(false);
-                  showToast('చెల్లింపు ధృవీకరించబడింది!');
-                }}
-              >
-                <CheckCircleIcon size={16} /> Mark as Received
-              </button>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
               <button
                 type="button"
                 className="btn btn-outline"
+                style={{ flex: 1 }}
                 onClick={() => setShowUpiModal(false)}
               >
-                Close
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  setShowUpiModal(false);
+                  showToast('UPI చెల్లింపు ధృవీకరించబడింది.');
+                  printLiveBill();
+                }}
+              >
+                Paid & Print Bill
               </button>
             </div>
           </div>
