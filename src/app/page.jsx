@@ -488,44 +488,54 @@ export default function HomePage() {
       {/* ================= LEFT COLUMN: COMPACT VOICE & QUICK CATALOG ================= */}
       <div className="pos-left-deck">
 
-        {/* Compact Voice Action Strip */}
-        <div className="voice-compact-bar">
-          <button
-            type="button"
-            className={`voice-mic-btn ${isRecording ? 'recording' : ''}`}
-            onClick={toggleRecording}
-            title={isRecording ? 'Stop Voice Recording' : 'Start Voice Input [Shortcut: F2]'}
-          >
-            {isRecording ? <MicOffIcon size={18} /> : <MicIcon size={18} />}
-          </button>
-
-          <div className="voice-stream-container">
-            <div className="voice-stream-label">
-              <span>{isRecording ? '● Active Microphone' : 'Telugu Voice [F2]'}</span>
-              {isAnalyzing && <span style={{ color: 'var(--primary-dark)' }}>• Parsing intent...</span>}
-            </div>
-            <div className="voice-stream-text" title={transcript}>
-              {transcript}
-            </div>
-          </div>
-
-          <div className="voice-sim-strip">
+        {/* Streamlined Professional Voice Assistant Card */}
+        <div className="voice-assistant-card">
+          <div className="voice-assistant-top">
             <button
               type="button"
-              className="voice-sim-chip"
-              onClick={() => simulateSpokenText('రమేష్కి పది బస్తాల సిమెంట్, రెండు పెయింట్ బకెట్లు')}
-              title="Quick test prompt"
+              className={`voice-mic-hero ${isRecording ? 'recording' : ''}`}
+              onClick={toggleRecording}
+              title={isRecording ? 'Stop Voice Recording' : 'Start Voice Input [Shortcut: F2]'}
             >
-              10 Cement, 2 Paint
+              {isRecording ? <MicOffIcon size={16} /> : <MicIcon size={16} />}
+              <span>{isRecording ? 'Listening...' : 'Speak [F2]'}</span>
             </button>
-            <button
-              type="button"
-              className="voice-sim-chip"
-              onClick={() => simulateSpokenText('ఐదు కిలోల బియ్యం, రెండు కిలోల కందిపప్పు')}
-              title="Quick test prompt"
-            >
-              5kg Rice, 2kg Dal
-            </button>
+
+            <div className="voice-stream-bubble">
+              <span className="voice-badge-tag">{isRecording ? '● Live' : 'AI Voice'}:</span>
+              <span className="voice-live-text" title={transcript}>
+                {transcript || 'తెలుగులో మాట్లాడండి... (ఉదా: "10 సిమెంట్ బస్తాలు, 2 పెయింట్")'}
+              </span>
+              {isAnalyzing && <span style={{ color: 'var(--primary-dark)', fontSize: '10px', fontWeight: 700 }}>Parsing...</span>}
+            </div>
+
+            <div className="voice-samples-inline">
+              <span className="voice-samples-label">Try:</span>
+              <button
+                type="button"
+                className="voice-sample-btn"
+                onClick={() => simulateSpokenText('రమేష్కి పది బస్తాల సిమెంట్, రెండు పెయింట్ బకెట్లు')}
+                title="Test 10 bags cement, 2 paint buckets"
+              >
+                10 Cement
+              </button>
+              <button
+                type="button"
+                className="voice-sample-btn"
+                onClick={() => simulateSpokenText('వంద గ్రాములు లవంగాలు, వంద గ్రాములు గసగసాలు, ఒక ప్యాకెట్ బాస్మతి బియ్యం')}
+                title="Test 100g cloves, 100g poppy, 1 pkt basmati"
+              >
+                100g Cloves
+              </button>
+              <button
+                type="button"
+                className="voice-sample-btn"
+                onClick={() => simulateSpokenText('ఐదు కిలోల బియ్యం, రెండు కిలోల కందిపప్పు')}
+                title="Test 5kg rice, 2kg dal"
+              >
+                5kg Rice
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1020,7 +1030,7 @@ export default function HomePage() {
               style={{ padding: '3px 4px', fontSize: '10px' }}
               onClick={promptAddItem}
             >
-              <PlusIcon size={11} /> + Custom
+              <PlusIcon size={11} /> Custom
             </button>
             <button
               type="button"
